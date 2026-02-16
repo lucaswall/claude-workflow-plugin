@@ -120,28 +120,21 @@ Append to the common preamble:
 ```
 YOUR DOMAIN: Security & Authentication
 
-Check for:
-- OWASP A01: Broken Access Control — public endpoints intentional? Auth middleware on protected routes? IDOR prevention?
-- OWASP A02: Secrets & Credentials — hardcoded secrets? Secrets in git? Sensitive data logged? Error messages leaking internals?
-- OWASP A03: Injection — user input sanitized? Command injection? Path traversal? XSS in rendered content? SSRF (user-controlled URLs in server-side fetch)?
-- OWASP A07: Authentication — tokens validated on every request? Auth middleware consistent? Session handling secure? Constant-time comparison for tokens/API keys (crypto.timingSafeEqual, not ===)?
-- HTTPS & Transport — external calls use HTTPS? Certificate validation not disabled?
-- Security Headers — CSP, X-Content-Type-Options, X-Frame-Options, HSTS configured?
-- Rate limiting — API quotas handled? Backoff for 429s?
-- Cookie security — httpOnly, secure, sameSite flags?
+Focus areas (full details in compliance-checklist.md):
+- OWASP A01: Broken Access Control — auth middleware, IDOR, privilege escalation
+- OWASP A02: Secrets & Credentials — hardcoded secrets, secrets in logs/errors
+- OWASP A03: Injection — SQL, command, path traversal, XSS, SSRF
+- OWASP A07: Authentication — token validation, session security, constant-time comparison
+- Security headers (CSP, HSTS, X-Content-Type-Options, X-Frame-Options)
+- Cookie security, rate limiting
+- AI-generated code risks (higher XSS frequency, missing validation, hallucinated packages)
 
 Search patterns (use Grep):
 - `password|secret|api.?key|token` (case insensitive) — potential hardcoded secrets
 - `eval\(|new Function\(` — dangerous code execution
 - `exec\(|spawn\(` with variable input — command injection
-- `fetch\(.*\$|fetch\(.*\+` — potential SSRF (user-controlled URLs)
+- `fetch\(.*\$|fetch\(.*\+` — potential SSRF
 - Log statements containing `password|secret|token|key|auth|headers|req\.body`
-
-AI-Generated Code Risks:
-- XSS vulnerabilities (2.74x higher in AI code)
-- Missing input validation — AI often skips server-side validation
-- Hallucinated security APIs — verify methods exist in the actual library
-- Hallucinated packages — verify imports reference real packages in package.json
 ```
 
 ### Reliability Reviewer Prompt (name: "reliability-reviewer")
@@ -151,16 +144,16 @@ Append to the common preamble:
 ```
 YOUR DOMAIN: Bugs, Async, Resources & Reliability
 
-Check for:
-- Logic errors — off-by-one, empty array/object edge cases, wrong comparisons, assignment vs comparison
-- Null handling — nullable types without explicit handling, missing null checks
-- Race conditions — shared state mutations, concurrent access without locks
-- Async issues — promises without .catch(), async functions without try/catch, unhandled rejections, Promise.all error handling
-- Memory leaks — unbounded arrays/Maps/Sets, event listeners without cleanup (.on without .off), timers without clearInterval, closures capturing large objects
-- Resource leaks — connections not returned to pool, file handles not closed, streams not destroyed on error
-- Timeout/hang scenarios — HTTP requests without timeout, API calls that could hang (Claude, Fitbit, Google), no circuit breaker
-- Graceful shutdown — SIGTERM/SIGINT handlers? Cleanup on shutdown? Pending requests handled?
-- Boundary conditions — empty inputs, single-element collections, max-size inputs, negative/zero values
+Focus areas (full details in compliance-checklist.md):
+- Logic errors — off-by-one, empty collections, wrong comparisons
+- Null/undefined handling — nullable types, missing null checks
+- Race conditions — shared state, concurrent access
+- Async issues — unhandled promises, missing try/catch, Promise.all error handling
+- Memory leaks — unbounded collections, event listeners, timers, closures
+- Resource leaks — connections, file handles, streams not cleaned up
+- Timeout/hang — HTTP requests without timeout, external API calls
+- Graceful shutdown — SIGTERM/SIGINT, cleanup, request draining
+- Boundary conditions — empty inputs, max-size, negative/zero
 
 Search patterns (use Grep):
 - `\.then\(` without `.catch` nearby — unhandled promise
@@ -179,68 +172,41 @@ Append to the common preamble:
 ```
 YOUR DOMAIN: Type Safety, Conventions, Logging & Test Quality
 
-Check for:
+Focus areas (full details in compliance-checklist.md):
+
 TYPE SAFETY:
-- Unsafe `any` casts without justification
-- Type assertions (`as Type`) that may be wrong
-- Union types without exhaustive handling
-- External data used without validation (API responses, AI outputs, file parsing)
+- Unsafe `any` casts, incorrect type assertions, missing exhaustive handling
+- External data used without validation (API responses, AI outputs)
 - Missing runtime validation for API inputs
 
 CLAUDE.md COMPLIANCE (read CLAUDE.md first!):
-- Import path conventions (@/ alias)
-- Naming conventions (files: kebab-case, components: PascalCase, etc.)
-- Error response format compliance
-- Server vs client component usage
-- Any other project-specific rules
+- Import conventions, naming conventions, error response format
+- Server vs client component usage, all project-specific rules
 
 LOGGING:
-- console.log/warn/error instead of proper logger
-- Wrong log levels (errors at INFO, critical at DEBUG)
-- Missing logs in error paths (empty catch blocks)
-- Log overflow risks (logging in tight loops, large objects)
-- Sensitive data in logs
-- Missing structured logging fields
-
-DEAD CODE & DUPLICATION:
-- Unused functions, unreachable code
-- Repeated logic that could be a single function
-- Commented-out code blocks
+- Wrong logger (console.* vs proper logger), wrong log levels
+- Missing logs in error paths, lib modules with zero logging
+- Double-logging (same error at multiple layers, or before auto-logging error response helpers)
+- Missing structured fields ({ action }), missing durationMs on external API calls
+- Log overflow risks (logging in loops, large objects), sensitive data in logs
 
 TEST QUALITY (if tests exist):
-- Tests with no meaningful assertions
-- Tests that always pass
-- Duplicate tests
-- Mocks that hide real bugs
-- No real customer data in tests
+- Tests with no meaningful assertions or that always pass
+- Mocks that hide real bugs, missing edge case coverage
 
-AI INTEGRATION (Claude API):
-- Tool definitions have detailed descriptions (3-4+ sentences, the #1 performance lever)
-- Tool parameters have descriptions with examples; constrained values use enums
-- System prompts have clear role definition and tool usage guidance
-- System prompts stay in sync with tool definitions (no stale references)
-- stop_reason handled for all values (tool_use, end_turn, max_tokens)
-- tool_result.tool_use_id matches tool_use.id; parallel results in ONE user message
-- Agentic loops capped with max iterations (prevent infinite cycles)
-- tool_use.input validated at runtime (don't trust AI output)
-- max_tokens set appropriately (not too high, not truncation-prone)
-- Token usage recorded (fire-and-forget, non-blocking)
-- Claude API key from env var (not hardcoded, not logged)
-- No user input injected raw into system prompts (prompt injection risk)
-- AI-generated content sanitized before HTML rendering (XSS prevention)
-- Tool results don't include raw secrets/tokens
-- is_error: true set on tool_result for execution errors
-- Rate limiting on Claude API endpoints
+AI INTEGRATION (Claude API — if AI code in scope):
+- Tool definitions detailed with parameter descriptions and enums
+- stop_reason handled for all values (tool_use, end_turn, max_tokens, refusal, model_context_window_exceeded)
+- Agentic loops capped, tool_use.input validated at runtime
+- Token usage recorded, API key from env var, no user input in system prompts
 
 Search patterns (use Grep):
 - `as any` — unsafe type cast
-- `as unknown as` — double cast
+- `as unknown as` — double cast (check CLAUDE.md accepted patterns first)
 - `@ts-ignore|@ts-expect-error` — suppressed type errors
-- `console\.log|console\.warn|console\.error` — should use proper logger
+- `console\.log|console\.warn|console\.error` — should use proper logger (CLAUDE.md may allow in client components)
 - `catch\s*\([^)]*\)\s*\{[^}]*\}` — empty catch blocks
 - `stop_reason` — verify all values handled
-- `tool_use_id|tool_result` — verify ID matching
-- `ANTHROPIC_API_KEY` — verify env-loaded, not logged
 - `max_tokens` — verify reasonable limits
 ```
 
@@ -306,13 +272,13 @@ labels: [Mapped label(s)]
 [Clear, specific problem statement — 1-2 sentences]
 
 **Context:**
-[Affected file paths with line numbers, e.g. `src/lib/fitbit.ts:120-135`]
+[Affected file paths with line numbers, e.g. `src/lib/api-client.ts:120-135`]
 
 **Impact:**
 [Why this matters — user-facing impact, data integrity, security risk, etc.]
 
 **Acceptance Criteria:**
-- [ ] [Specific, verifiable criterion — e.g. "API returns error response when DB insert fails after Fitbit log"]
+- [ ] [Specific, verifiable criterion — e.g. "API returns error response when DB insert fails"]
 - [ ] [Another criterion]
 ```
 

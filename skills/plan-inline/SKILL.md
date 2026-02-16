@@ -58,7 +58,7 @@ If PLANS.md is empty or has "Status: COMPLETE" → proceed with planning.
 
 Read CLAUDE.md to find the LINEAR INTEGRATION section. Look for:
 - **Team name** (e.g., "Team: 'Food Scanner'" or "Team: 'ProjectName'")
-- **Issue prefix** (e.g., "Prefix: FOO-xxx" or "Prefix: PROJ-xxx")
+- **Issue prefix** (e.g., "Prefix: PROJ-xxx")
 - **State workflow** (e.g., "States: Backlog → Todo → In Progress → Review → Done")
 - **Project-specific URLs** (Linear workspace URL, deployment URLs, etc.)
 

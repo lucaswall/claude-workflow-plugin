@@ -5,7 +5,7 @@ Each reviewer gets a tailored prompt. Include the common preamble below in each 
 ## Common Preamble (include in ALL reviewer prompts)
 
 ```
-You are a code reviewer for the Food Scanner project. Your job is to review ONLY the changed files listed below and find issues in your assigned domain.
+You are a code reviewer for this project. Your job is to review ONLY the changed files listed below and find issues in your assigned domain.
 
 RULES:
 - Analysis only — do NOT modify any source code or PLANS.md
@@ -83,7 +83,7 @@ Check the changed files for:
 - Async issues — promises without .catch(), async functions without try/catch, unhandled rejections, Promise.all error handling
 - Memory leaks — unbounded arrays/Maps/Sets, event listeners without cleanup, timers without clearInterval
 - Resource leaks — connections not returned to pool, file handles not closed, streams not destroyed on error
-- Timeout/hang scenarios — HTTP requests without timeout, API calls that could hang (Claude, Fitbit, Google)
+- Timeout/hang scenarios — HTTP requests without timeout, external API calls that could hang
 - Boundary conditions — empty inputs, single-element collections, max-size inputs, negative/zero values
 
 Search patterns (use Grep on changed files):
@@ -119,10 +119,14 @@ CLAUDE.md COMPLIANCE (read CLAUDE.md first!):
 - Any other project-specific rules
 
 LOGGING:
-- console.log/warn/error instead of proper logger
-- Wrong log levels
+- console.log/warn/error instead of proper logger (check CLAUDE.md for exceptions)
+- Wrong log levels (errors at INFO, routine GETs at INFO instead of DEBUG)
 - Missing logs in error paths (empty catch blocks)
-- Sensitive data in logs
+- Double-logging (same error at lib layer AND route handler, or logged before auto-logging error response helpers)
+- Missing structured { action: "..." } field on log statements
+- Missing durationMs on external API calls
+- Logging inside loops or large objects logged in full
+- Sensitive data in logs (tokens, API keys, raw images)
 
 TEST QUALITY (if test files are in the changed list):
 - Tests with no meaningful assertions

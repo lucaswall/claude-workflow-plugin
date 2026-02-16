@@ -167,6 +167,28 @@ Reference for plan-review-implementation skill.
 - [ ] No production credentials
 - [ ] Test data clearly fictional
 
+## Logging Quality
+
+### Logger Usage
+- [ ] Proper logger used (not console.log/warn/error in server code)
+- [ ] Log levels appropriate (ERROR for failures, INFO for state changes, DEBUG for routine operations)
+- [ ] Error catch blocks have logging with context
+- [ ] Lib modules doing significant work have logging (no blind spots in data layer)
+
+### Structured Logging
+- [ ] Logs use structured format with `{ action: "..." }` field
+- [ ] External API calls log `durationMs`
+- [ ] No sensitive data in logs (tokens, passwords, API keys, raw image data)
+
+### Double-Logging Prevention
+- [ ] Same error not logged at lib layer AND calling route handler
+- [ ] Errors passed to auto-logging helpers not also manually logged
+- [ ] Catch-and-rethrow doesn't produce duplicate log entries
+
+### Log Overflow
+- [ ] No logging inside tight loops or array iterations
+- [ ] Large objects truncated or summarized, not logged in full
+
 ## Project-Specific (CLAUDE.md)
 
 Always check CLAUDE.md for project-specific rules including:

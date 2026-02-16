@@ -59,8 +59,7 @@ Store the discovered team name in a variable for use throughout the skill.
 2. **Identify items** - Separate multiple items from the input
 3. **Check existing Backlog** - Avoid duplicates
 4. **Draft issues** - Write problem-focused descriptions
-5. **Confirm with user** - Show proposed issues before creating
-6. **Create in Linear** - Add to Backlog state
+5. **Create in Linear** - Add to Backlog state
 
 ## Issue Structure
 
@@ -147,39 +146,11 @@ Before creating, check existing Backlog:
 1. Query `mcp__linear__list_issues` with `team=[discovered team name], state=Backlog, includeArchived=false`
 2. Compare proposed issues against existing titles/descriptions
 3. If similar issue exists:
-   - Note as "Similar to PROJ-XXX"
-   - Ask user if they want to create anyway or skip
-
-## User Confirmation
-
-Before creating issues, show the user what will be created:
-
-```
-I'll create the following Backlog issues:
-
-1. **Rate limiting missing on API routes** (Security, High)
-   No rate limiting on public API endpoints, vulnerable to abuse.
-   Hint: Use Next.js middleware with upstash/ratelimit or similar
-
-2. **Image upload error handling incomplete** (Bug, Medium)
-   Upload failures show generic error, no retry or user guidance.
-   Hint: Add specific error types in the upload handler
-
-3. **Barcode scanner fails on blurry images** (Bug, High)
-   Low-quality camera input causes scanner to return no results silently.
-   Hint: Add image quality detection before scanning attempt
-
-Similar existing issues found:
-- PROJ-12: "API security hardening" - might overlap with #1
-
-Create these issues? (I'll skip duplicates unless you confirm)
-```
-
-Wait for user confirmation before proceeding.
+   - Skip the duplicate automatically
 
 ## Creating Issues
 
-Use `mcp__linear__create_issue` for each confirmed issue:
+Use `mcp__linear__create_issue` for each issue (skip duplicates automatically):
 
 ```
 team: [Discovered team name]
@@ -234,12 +205,11 @@ Add rate limiting. Use upstash ratelimit library. Create a middleware that check
 | $ARGUMENTS empty | Ask user what to add |
 | Can't parse items | Show interpretation, ask for clarification |
 | Linear unavailable | Stop, tell user to check Linear auth |
-| All items are duplicates | Report existing issues, ask if user wants to create anyway |
+| All items are duplicates | Report existing issues, skip creation |
 | Conversation reference unclear | List recent topics, ask which to add |
 
 ## Rules
 
-- **Always confirm before creating** - Show proposed issues first
 - **Problem-focused** - Describe what's wrong, not how to fix
 - **Include hints** - Help plan-backlog with implementation suggestions
 - **Check duplicates** - Avoid cluttering backlog

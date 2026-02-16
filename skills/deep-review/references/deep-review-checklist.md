@@ -14,15 +14,15 @@ Trace data from source to display and back.
 - Request body shape from client matches what the API route validates/expects
 
 ### Type Safety Across Boundaries
-- Shared types in `src/types/` used by BOTH the API route and the client
+- Shared types used by BOTH the API route and the client
 - No `as any` or `as Type` casts that paper over a contract mismatch
 - API response transformations preserve type safety (no lossy conversions)
-- Fitbit API responses validated before use (external data boundary)
+- Third-party API responses validated before use (external data boundary)
 - Claude API responses validated before use (AI output boundary)
 
 ### Data Transformation
 - Date/time values serialized and deserialized correctly across client/server boundary
-- Numeric values (calories, weight) maintain precision through transformations
+- Numeric values maintain precision through transformations
 - Arrays/collections handled correctly when empty, single-element, or large
 - Undefined vs null vs missing key handled consistently
 
@@ -51,7 +51,7 @@ Trace data from source to display and back.
 ### API Route Errors
 - Every `await` in API routes wrapped in try/catch or within a try block
 - Database errors return appropriate HTTP status (500, not swallowed)
-- External API errors (Fitbit, Claude) return appropriate HTTP status
+- External API errors (third-party services, Claude) return appropriate HTTP status
 - Validation errors return 400 with useful error message
 - Auth failures return 401/403 consistently
 - Error responses use standardized format (ErrorCode from src/types)
@@ -66,7 +66,7 @@ Trace data from source to display and back.
 ### Error Recovery
 - User can retry after transient failures without full page refresh
 - Form data preserved after submission failure (not cleared on error)
-- Partial success states handled (e.g., analysis succeeded but Fitbit log failed)
+- Partial success states handled (e.g., primary operation succeeded but secondary action failed)
 
 ## 4. Edge Cases
 
@@ -74,12 +74,12 @@ Trace data from source to display and back.
 - Component renders correctly with no data (empty arrays, null values)
 - Empty state has clear messaging and call to action
 - API returns appropriate response for empty results (empty array, not 404)
-- First-time user experience works (no prior data, no Fitbit connection)
+- First-time user experience works (no prior data, no external integrations configured)
 
 ### Boundary Values
 - Very long text (food descriptions, names) handled (truncation, wrapping)
 - Very large numbers (high-calorie meals) display correctly
-- Zero values displayed correctly (0 calories is valid, not treated as "missing")
+- Zero values displayed correctly (0 is valid, not treated as "missing")
 - Special characters in user input don't break display or queries
 - Multiple rapid submissions handled (debounce or button disable)
 
@@ -93,9 +93,9 @@ Trace data from source to display and back.
 
 ### Authentication & Authorization
 - Route handler checks session/auth before processing
-- Session validation matches CLAUDE.md convention (getSession + validateSession for browser, validateApiRequest for v1)
-- OAuth tokens stay server-side, never exposed to client
-- Allowlist enforcement (ALLOWED_EMAILS) applied consistently
+- Session validation matches CLAUDE.md convention
+- OAuth/API tokens stay server-side, never exposed to client
+- Access controls applied consistently (check CLAUDE.md for auth patterns)
 - Constant-time comparison for sensitive values (tokens, API keys) — use `crypto.timingSafeEqual()`, not `===`
 
 ### Input Validation
@@ -107,7 +107,7 @@ Trace data from source to display and back.
 - No SSRF — server-side requests use allowlisted URLs/domains, no user-controlled URLs passed to fetch
 
 ### Sensitive Data
-- Tokens, secrets, session data not logged (check pino calls)
+- Tokens, secrets, session data not logged (check logger calls)
 - Sensitive data not in client-accessible responses
 - Images not logged or stored longer than needed
 - Error responses don't leak internal details (stack traces, file paths)
@@ -122,7 +122,7 @@ Trace data from source to display and back.
 
 ### Feedback
 - Every user action has visible feedback (button state change, toast, inline message)
-- Success confirmations are specific ("Logged 450 cal to Fitbit" not "Success")
+- Success confirmations are specific (describe what was done, not just "Success")
 - Destructive actions require confirmation
 - Long operations show progress or at least a descriptive message
 
@@ -160,9 +160,25 @@ Trace data from source to display and back.
 - Images use next/image (auto optimization, lazy loading)
 - No waterfall requests that could be parallel
 
-## 8. AI Integration (Claude API)
+## 8. Logging Coverage
 
-This project uses Claude's tool_use API for food analysis and conversational chat. When the reviewed feature involves Claude API integration, trace the full AI data flow.
+### Across the Feature
+- Error paths in API routes log with context (action, inputs, error details)
+- External API calls log duration and outcome (durationMs)
+- Key state changes logged at INFO level (creates, updates, deletes)
+- Debug coverage exists for troubleshooting each layer (no blind spots in lib modules)
+
+### Common Issues
+- Same error logged at both lib module and route handler (double-logging)
+- Errors logged before auto-logging error response helpers (double-logging)
+- Missing structured { action: "..." } field — string-only messages can't be filtered
+- Sensitive data in logs (tokens, passwords, raw image data)
+- No logging in catch blocks (silent failures invisible in production)
+- Console.log/warn/error in server code instead of proper logger
+
+## 9. AI Integration (Claude API)
+
+When the reviewed feature involves Claude API integration, trace the full AI data flow.
 
 ### Tool Definition Quality
 
@@ -210,8 +226,8 @@ This project uses Claude's tool_use API for food analysis and conversational cha
 ### Response Validation
 
 - `tool_use.input` validated at runtime even when `strict: true` is set — Claude can still produce unexpected shapes on `max_tokens` truncation or `refusal`
-- Numeric fields validated as non-negative where appropriate (calories, protein, etc.)
-- String fields checked for non-empty where required (food_name, notes)
+- Numeric fields validated as non-negative where appropriate
+- String fields checked for non-empty where required
 - Keywords normalized (lowercase, deduplicated, capped at max count)
 - Handle empty text blocks (Claude may respond with only tool_use, no text)
 
@@ -238,11 +254,11 @@ Follow data through the full AI pipeline:
 
 4. **Final extraction** — Text + optional analysis returned to client
    - Is the final text response extracted from all text blocks (joined)?
-   - Is the optional analysis (from report_nutrition tool) validated before return?
+   - Is the optional tool output validated before return?
    - Is usage recorded (fire-and-forget, non-blocking)?
 
 5. **Client rendering** — Response displayed in chat UI
-   - Are assistant messages with analysis rendered with nutrition cards?
+   - Are assistant messages with tool results rendered with appropriate UI?
    - Is the conversation state updated correctly (both text and analysis)?
    - Does the latest analysis computation work with the new message?
 
@@ -268,7 +284,7 @@ Follow data through the full AI pipeline:
 - No user-controlled text injected raw into system prompts (prompt injection)
 - Claude API key loaded from environment variable (never hardcoded, never logged)
 - Tool results don't expose raw credentials, tokens, or session secrets
-- AI-generated content (food names, descriptions, notes) sanitized before HTML rendering (XSS)
+- AI-generated content sanitized before HTML rendering (XSS)
 - Rate limiting prevents abuse of expensive Claude API calls
 - Token usage tracked for cost monitoring
 
@@ -280,7 +296,7 @@ Follow data through the full AI pipeline:
 - Request size under 32MB limit for Messages API
 - Token usage recording failures don't break the main request flow
 
-## 9. AI-Generated Code Risks
+## 10. AI-Generated Code Risks
 
 All code in this project is AI-assisted. When tracing data flows and interactions, watch for these AI-specific patterns:
 
@@ -289,6 +305,6 @@ All code in this project is AI-assisted. When tracing data flows and interaction
 - **Hallucinated packages** — non-existent npm packages that may be claimed by attackers. Verify every `import` references a real package in `package.json`.
 - **Contract mismatches introduced by AI** — client assumes response fields that the API doesn't return, or vice versa
 - **Copy-paste patterns** — similar handler logic duplicated across routes instead of shared through a lib module
-- **Missing validation at boundaries** — AI often generates the "happy path" and skips validation of external data (Fitbit responses, Claude outputs, user input)
+- **Missing validation at boundaries** — AI often generates the "happy path" and skips validation of external data (third-party API responses, Claude outputs, user input)
 - **Inconsistent error handling** — some error paths return proper responses while others silently fail or return generic errors
 - **Over-abstraction** — unnecessary wrappers, helpers, or config for one-time operations

@@ -1,6 +1,6 @@
 # Code Audit Compliance Checklist
 
-Universal checks that apply to any project. Project-specific rules should be defined in CLAUDE.md.
+Detailed checks for code audit reviewers. Read CLAUDE.md for project-specific rules and accepted patterns.
 
 ## Security (OWASP-Based)
 
@@ -145,7 +145,7 @@ Universal checks that apply to any project. Project-specific rules should be def
 
 ### External API Calls
 - HTTP requests without timeout option
-- Third-party API calls that could hang indefinitely (Claude, Fitbit, Google)
+- Third-party API calls that could hang indefinitely (Claude, external services)
 - No circuit breaker for unreliable dependencies
 - Missing retry logic for transient failures (network errors, 5xx)
 
@@ -235,6 +235,32 @@ Check for patterns that could saturate the logging backend:
 - **JSON format**: Logs should be structured (JSON) not plain text for machine parsing
 - **Consistent fields**: Request ID, user ID, operation name included consistently
 - **Proper logger used**: No `console.log`/`console.error` in production code - use proper logging framework
+- **Action field on every log**: Every log statement should use `{ action: "operation_name" }` structured format, not string-only messages — enables log search/filtering
+- **No mixed formats**: Don't mix `logger.info("string only")` with `logger.info({ action }, "msg")` in the same module
+
+### Request-Scoped Logging
+
+- **Child loggers per request**: Route handlers should create child loggers with request context (method, path, request ID) rather than using the global logger directly
+- **Correlation IDs**: Requests should carry an ID that propagates through all downstream log calls so logs from one request can be traced together
+- **Context propagation**: When a route handler calls lib modules, request context (user ID, request ID) should flow into the logs without each module needing to manually attach it
+
+### Double-Logging Prevention
+
+- **No duplicate log events**: The same error/event should not be logged at multiple layers (e.g., lib module logs error AND route handler logs the same error again)
+- **Error response auto-logging**: If a centralized error response helper auto-logs, callers should not also log the same error — or the helper should not auto-log
+- **Catch-and-rethrow**: If a catch block logs an error and then rethrows, the upstream catcher should not log it again
+
+### Operation Timing
+
+- **External API call duration**: All calls to external APIs (Claude, third-party services, etc.) should log `durationMs` so slow calls are visible in logs
+- **Database query timing**: Long-running or critical DB operations should include timing at DEBUG level
+- **End-to-end request duration**: Route handlers should log total request duration for performance monitoring
+
+### Info vs Debug Level Strategy
+
+- **Routine reads are DEBUG, not INFO**: Successful GET requests returning cached or standard data should be DEBUG — INFO is for state changes and significant events
+- **State changes are INFO**: Creating, updating, or deleting records; auth flows; significant domain operations
+- **Only log at INFO what operators need to see**: If the log would be noise in production at steady state, it should be DEBUG
 
 ### Log Security
 
@@ -256,6 +282,17 @@ Use Grep tool to find potential logging issues:
 **Missing logs:**
 - `catch\s*\([^)]*\)\s*\{[^}]*\}` - empty or log-less catch blocks
 - API route handlers without any logger calls
+- Lib modules with zero `logger` imports (data layer blind spots)
+
+**Structural issues:**
+- `logger\.(info|warn|error)\("[^"]+"\)` without object first arg - missing structured `{ action }` format
+- Same error string appearing in both a lib module and its calling route handler - double logging
+- Error response helpers preceded by `logger.error` or `logger.warn` in same function - double logging with auto-log helper
+- Route handlers or lib modules using global `logger` directly instead of child/request-scoped logger
+
+**Timing gaps:**
+- External API calls (`fetch\(`, `anthropic\.`) without `durationMs` in their completion log
+- `Date\.now\(\)` or `performance\.now\(\)` captured but never logged
 
 **Log overflow risks:**
 - `for.*\{[^}]*logger\.|while.*\{[^}]*logger\.` - logging inside loops
@@ -270,7 +307,7 @@ Use Grep tool to find potential logging issues:
 ## Rate Limiting
 
 ### External API Quotas
-- Rate limit handling for third-party APIs (Claude, Fitbit, Google)
+- Rate limit handling for third-party APIs (Claude, external services)
 - Backoff/retry logic for 429 responses
 - Quota monitoring
 - Token/request budgeting for AI APIs
@@ -324,7 +361,7 @@ Use Grep tool (not bash grep) to find potential issues:
 
 ## Claude API & AI Integration
 
-This project uses Claude's tool_use API for food analysis and conversational chat. Review all Claude API integration code for these issues.
+If the project uses Claude's tool_use API, review all integration code for these issues.
 
 ### Tool Definitions
 
@@ -404,7 +441,7 @@ This project uses Claude's tool_use API for food analysis and conversational cha
 - No user-controlled text injected directly into system prompts without sanitization (prompt injection risk)
 - Claude API key loaded from environment variable (not hardcoded, not logged)
 - Tool results returned to Claude don't include raw tokens, passwords, or session secrets
-- AI-generated content (food names, descriptions) sanitized before rendering in HTML (XSS prevention)
+- AI-generated content sanitized before rendering in HTML (XSS prevention)
 - User descriptions validated/sanitized before inclusion in Claude API calls
 - Rate limiting prevents abuse of expensive Claude API endpoints
 
@@ -426,7 +463,7 @@ Use Grep tool to find potential AI integration issues:
 **Tool definitions:**
 - `tool_choice` — verify appropriate setting for each use case; check compatibility with thinking if enabled
 - `tools:.*\[` — find tool definition arrays, check descriptions are detailed
-- `report_nutrition|search_food_log|get_nutrition_summary|get_fasting_info` — tool name references
+- Project-specific tool names (check tool definitions in source) — tool name references
 - `strict` — check if `strict: true` is set on tool definitions for schema conformance
 
 **Response handling:**

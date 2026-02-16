@@ -16,7 +16,7 @@ Execute the current pending work in PLANS.md using an agent team for parallel im
 3. **Verify Linear MCP** — Call `mcp__linear__list_teams`. If unavailable, STOP and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
 4. **Discover project info from CLAUDE.md** — Read the LINEAR INTEGRATION section to find:
    - Team name (e.g., "Food Scanner")
-   - Issue prefix (e.g., FOO-xxx)
+   - Issue prefix (e.g., PROJ-xxx)
    - If LINEAR INTEGRATION section not found, call `mcp__linear__list_teams` to discover the team
 5. **Identify pending work** — Use this priority order:
    - Check latest Iteration block for "Tasks Remaining" section

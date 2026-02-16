@@ -140,10 +140,10 @@ Comprehensive checklist for frontend code review covering accessibility, visual 
 ## UX Patterns & User Flows
 
 ### Core User Flow
-- [ ] Photo → Analyze → Edit → Log flow has clear progression
+- [ ] Primary user flow has clear step-by-step progression
 - [ ] User knows current step and can navigate between steps
 - [ ] Back/undo available at each step
-- [ ] Confirmation before committing (logging to Fitbit)
+- [ ] Confirmation before committing irreversible actions
 - [ ] Success feedback after completing the flow
 
 ### Cognitive Load & Information Architecture
@@ -156,16 +156,16 @@ Comprehensive checklist for frontend code review covering accessibility, visual 
 - [ ] Recognition over recall: options visible, not hidden
 
 ### Microcopy & Content Design
-- [ ] Button labels describe action outcome ("Log to Fitbit" not "Submit")
+- [ ] Button labels describe action outcome (specific verb, not "Submit")
 - [ ] Error messages explain what went wrong AND what to do next
 - [ ] Empty states guide the user with specific next action
-- [ ] Loading messages set expectations where possible ("Analyzing your meal...")
-- [ ] Confirmations are specific ("Logged 450 cal lunch to Fitbit" not "Success!")
-- [ ] Terminology consistent throughout (don't mix "meal"/"food"/"entry" for same concept)
-- [ ] Tone appropriate for health/fitness context (helpful, not cutesy)
+- [ ] Loading messages set expectations where possible (describe operation, not just a spinner)
+- [ ] Confirmations are specific (describe what was done, not just "Success!")
+- [ ] Terminology consistent throughout (don't mix different terms for the same concept)
+- [ ] Tone appropriate for the app's context (helpful, not cutesy)
 
 ### Emotional Design & Trust
-- [ ] AI confidence display calibrated (not overselling certainty)
+- [ ] AI confidence display calibrated if applicable (not overselling certainty)
 - [ ] Personal data not unnecessarily exposed on screen
 - [ ] Success moments feel rewarding
 - [ ] Error moments feel recoverable, not punishing
@@ -198,9 +198,9 @@ Comprehensive checklist for frontend code review covering accessibility, visual 
 - [ ] Retry option available for transient failures
 
 ### Empty States
-- [ ] Empty photo list has clear call to action
-- [ ] No analysis yet has helpful prompt
-- [ ] No Fitbit connection guides user to settings
+- [ ] Empty data lists have clear call to action
+- [ ] First-use states have helpful prompts
+- [ ] Missing integrations/connections guide user to settings
 
 ### Responsive Design
 - [ ] Mobile-first: base styles target mobile, breakpoints for larger
@@ -236,7 +236,7 @@ Comprehensive checklist for frontend code review covering accessibility, visual 
 - [ ] Above-the-fold images NOT lazy loaded
 - [ ] Off-screen images lazy loaded
 - [ ] Image sizes appropriate for display dimensions
-- [ ] HEIC conversion handled before upload
+- [ ] Image format conversion handled before upload if needed (HEIC, etc.)
 
 ### Font Optimization
 - [ ] `next/font` used (auto optimization, self-hosting)
@@ -299,7 +299,7 @@ This section is checked by analyzing rendered screenshots, not source code. It c
 - [ ] Font sizes readable at mobile scale without zooming
 - [ ] Clear hierarchy between headings, body text, and labels
 - [ ] No text truncated unexpectedly, overflowing containers, or visually cramped
-- [ ] Numbers and data (calories, macros) are prominently readable
+- [ ] Numbers and key data are prominently readable
 
 ### Touch Targets (visual assessment)
 - [ ] Interactive elements (buttons, links, nav items) look large enough to tap comfortably
@@ -308,7 +308,7 @@ This section is checked by analyzing rendered screenshots, not source code. It c
 - [ ] Bottom navigation items evenly spaced with comfortable tap zones
 
 ### Empty & Guard States
-- [ ] "Set up Fitbit" guard screens look intentional, not broken
+- [ ] Setup/onboarding guard screens look intentional, not broken
 - [ ] Clear visual guidance on what to do next (CTA is prominent)
 - [ ] Blank space in empty states feels like a design choice, not a missing feature
 - [ ] Guard state messaging is centered and inviting
@@ -329,7 +329,7 @@ This section is checked by analyzing rendered screenshots, not source code. It c
 
 ### Best Practices for Screenshot Analysis
 - **Compare screens side-by-side mentally** — note any inconsistency in element sizing, spacing, or style
-- **Trace the user journey** — landing → dashboard → analyze/quick-select → history → food-detail → settings
+- **Trace the user journey** — follow the primary flow through all key screens (consult CLAUDE.md for app-specific flows)
 - **Check the "squint test"** — blur your focus: does the visual hierarchy still communicate clearly?
 - **Evaluate empty states critically** — these are often the first thing new users see
 - **Note first impressions** — what stands out immediately on each screen? Is it the right thing?

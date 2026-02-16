@@ -87,7 +87,7 @@ Walk through the user's journey for this feature:
 1. **Arrival** — User navigates to the screen. What loads? What can fail during load?
 2. **Interaction** — User takes actions. What state changes? What API calls fire? What race conditions exist?
 3. **Server processing** — What validates input? What can fail? How do errors propagate back?
-4. **AI integration** — If the feature involves Claude API: trace input preparation → API call → tool loop → response validation → client rendering. Check tool definitions, system prompts, agentic loop correctness, and response validation (see checklist section 8).
+4. **AI integration** — If the feature involves Claude API: trace input preparation → API call → tool loop → response validation → client rendering. Check tool definitions, system prompts, agentic loop correctness, and response validation (see checklist section 9).
 5. **UI update** — Does the component handle all response shapes? All error types? Loading states?
 6. **Edge cases** — Empty data, concurrent actions, stale cache, network failure, large payloads, back/forward navigation
 

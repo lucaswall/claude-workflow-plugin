@@ -111,10 +111,9 @@ When the user decides on an action:
 ### If adding to backlog:
 
 1. Verify Linear MCP: call `mcp__linear__list_teams`. If unavailable, STOP: "Linear MCP not connected. Run `/mcp` to reconnect."
-2. Draft Backlog issues following the add-to-backlog patterns (problem-focused descriptions, proper labels and priority)
-3. Show proposed issues to user for confirmation before creating
-4. After creation, ask: **"Remove this feature from the roadmap file?"**
-5. If confirmed → run roadmap cleanup procedure
+2. Create Backlog issues following the add-to-backlog patterns (problem-focused descriptions, proper labels and priority)
+3. After creation, ask: **"Remove this feature from the roadmap file?"**
+4. If confirmed → run roadmap cleanup procedure
 
 ### If making an inline plan:
 

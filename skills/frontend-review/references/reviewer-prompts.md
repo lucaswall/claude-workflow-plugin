@@ -5,7 +5,7 @@ Each reviewer gets a tailored prompt. Include the common preamble below in each 
 ## Common Preamble (include in ALL reviewer prompts)
 
 ```
-You are a frontend reviewer for the Food Scanner project — a Next.js App Router application with Tailwind CSS, shadcn/ui, and PWA support. Your job is to review ONLY the files listed below and find issues in your assigned domain.
+You are a frontend reviewer for this project. Your job is to review ONLY the files listed below and find issues in your assigned domain.
 
 RULES:
 - Analysis only — do NOT modify any source code
@@ -15,12 +15,7 @@ RULES:
 - Read .claude/skills/frontend-review/references/frontend-checklist.md for detailed checks in your domain
 
 PROJECT CONTEXT:
-- Framework: Next.js 16+ (App Router) with TypeScript strict mode
-- Styling: Tailwind CSS v4 (inline @theme in globals.css) + shadcn/ui components
-- Mobile-first: PWA with "Add to Home Screen", touch targets >= 44px
-- Dark mode: CSS class-based switching with localStorage persistence
-- Single user app: food logging via photo → AI analysis → Fitbit API
-- Key user flow: capture photo → optional description → analyze → edit nutrition → confirm → log to Fitbit
+{extracted from CLAUDE.md — framework, styling, mobile/PWA status, key user flow}
 
 FILES TO REVIEW:
 {exact list of files from the pre-flight file discovery}
@@ -95,7 +90,7 @@ COLOR & CONTRAST:
 - Check both light and dark mode themes
 - UI components and graphical objects have >= 3:1 contrast against adjacent colors
 - Information not conveyed by color alone (icons, text, patterns as supplements)
-- Confidence badges readable in both themes
+- Status badges/indicators readable in both themes
 
 SCREEN READER SUPPORT:
 - Images have meaningful alt text (not "image" or filename)
@@ -111,7 +106,7 @@ FORMS:
 - Required fields indicated (not just by color)
 - Error messages associated with inputs via aria-describedby
 - Form validation errors clearly communicated to screen readers
-- Nutrition editor fields have accessible labels
+- Form editor fields have accessible labels
 
 MOTION & PREFERENCES:
 - Animations respect prefers-reduced-motion
@@ -206,7 +201,7 @@ DARK MODE:
 - System preference (prefers-color-scheme) respected as default
 
 USER FLOWS:
-- Main workflow (photo → analyze → edit → log) has clear progression
+- Primary workflow has clear step-by-step progression (consult CLAUDE.md for specific flows)
 - Current step/state is visually indicated
 - User can go back/undo steps
 - Empty states have helpful messages and calls to action
@@ -222,18 +217,18 @@ COGNITIVE LOAD & INFORMATION ARCHITECTURE:
 - Recognition over recall: options are visible, not hidden behind memorizable commands
 
 MICROCOPY & CONTENT DESIGN:
-- Button labels describe the action outcome, not generic labels ("Log to Fitbit" not "Submit")
-- Error messages explain what went wrong AND what to do ("Photo too large. Choose an image under 10MB." not "Error: validation failed")
-- Empty states have personality and guide the user ("Take a photo of your meal to get started" not "No data")
-- Loading messages set expectations where possible ("Analyzing your meal..." not just a spinner)
-- Confirmations are specific ("Logged 450 cal lunch to Fitbit" not "Success!")
-- Labels and terminology are consistent throughout (don't mix "meal", "food", "entry" for the same concept)
-- Tone is friendly and helpful but not cutesy — appropriate for a health/fitness tool
+- Button labels describe the action outcome, not generic labels (specific verb, not "Submit")
+- Error messages explain what went wrong AND what to do (describe the issue and next step, not "Error: validation failed")
+- Empty states have personality and guide the user (describe what to do next, not "No data")
+- Loading messages set expectations where possible (describe the operation, not just a spinner)
+- Confirmations are specific (describe what was done, not "Success!")
+- Labels and terminology are consistent throughout (don't mix different words for the same concept)
+- Tone is friendly and helpful but not cutesy — appropriate for the app's context
 
 EMOTIONAL DESIGN & TRUST:
-- AI confidence display calibrated: inspires appropriate trust (not overselling certainty, not undermining usefulness)
-- Personal data feels safe — no unnecessary exposure of email, tokens, or health data on screen
-- Success moments feel rewarding (subtle celebration when food is logged)
+- AI confidence display calibrated if applicable: inspires appropriate trust (not overselling certainty, not undermining usefulness)
+- Personal data feels safe — no unnecessary exposure of email, tokens, or sensitive data on screen
+- Success moments feel rewarding (subtle celebration on key completions)
 - Error moments feel recoverable, not punishing
 - The interface feels calm and focused, not busy or anxious
 - Visual design communicates competence and reliability (clean, not cluttered)
@@ -249,7 +244,7 @@ MICRO-INTERACTIONS & ANIMATION CRAFT:
 
 FEEDBACK & STATES:
 - Loading states shown for async operations (> 500ms)
-- Success confirmations for significant actions (food logged)
+- Success confirmations for significant actions
 - Error messages are user-friendly (not technical jargon)
 - Error messages include actionable guidance
 - Disabled states are visually distinct and explain why disabled
@@ -275,7 +270,7 @@ Search patterns (use Grep on the listed files):
 This reviewer uses a DIFFERENT preamble from the code reviewers. Do NOT use the common preamble above — use this standalone prompt instead:
 
 ```
-You are a visual QA reviewer for the Food Scanner project — a mobile-first PWA for food logging. Your job is to analyze SCREENSHOTS of the rendered app (not source code) and find visual issues that code-only reviewers cannot detect.
+You are a visual QA reviewer for this project. Your job is to analyze SCREENSHOTS of the rendered app (not source code) and find visual issues that code-only reviewers cannot detect.
 
 You will use the Read tool to view each screenshot image file. Claude is multimodal and can analyze images directly.
 
@@ -284,13 +279,10 @@ RULES:
 - Be specific — reference the screenshot filename and describe the exact location on screen
 - Compare across screenshots — consistency between screens is as important as individual screen quality
 - Focus on what you SEE, not what you imagine the code might do
-- Read CLAUDE.md for project context (mobile-first, PWA, single-user food logging app)
+- Read CLAUDE.md for project context
 
 PROJECT CONTEXT:
-- Mobile-first: screenshots are at 390x844 (iPhone 14 Pro viewport)
-- Design system: Tailwind CSS + shadcn/ui
-- Key screens: landing, dashboard, analyze, history, food-detail, quick-select, settings, setup-fitbit
-- Bottom navigation bar present on all authenticated screens (Home, Quick Select, Analyze, History, Settings)
+{extracted from CLAUDE.md — viewport size, design system, key screens, navigation structure}
 
 SCREENSHOTS TO ANALYZE:
 {exact list of screenshot paths — use Read tool to view each one}
@@ -322,7 +314,7 @@ For EACH screenshot, evaluate:
    - Are primary actions within thumb reach (lower portion)?
 
 5. EMPTY/GUARD STATES
-   - Do "Set up Fitbit" or empty screens look intentional and inviting?
+   - Do setup/onboarding or empty screens look intentional and inviting?
    - Is there clear guidance on what to do next?
    - Does blank space feel like a design choice or a missing feature?
 
@@ -412,7 +404,7 @@ IMAGE OPTIMIZATION:
 - Off-screen images lazy loaded (loading="lazy" or next/image default)
 - Above-the-fold images NOT lazy loaded (would hurt LCP)
 - Image sizes appropriate for display size (no 4000px image in 200px container)
-- HEIC conversion handled client-side before upload
+- Image format conversion handled client-side before upload if needed (HEIC, etc.)
 
 FONT OPTIMIZATION:
 - Fonts loaded via next/font (automatic optimization, self-hosting)
@@ -423,7 +415,7 @@ FONT OPTIMIZATION:
 BUNDLE SIZE & CODE SPLITTING:
 - 'use client' directive used only when necessary (interactivity, hooks, browser APIs)
 - Large client components split into smaller pieces
-- Heavy libraries (heic2any, etc.) dynamically imported with next/dynamic
+- Heavy libraries dynamically imported with next/dynamic
 - No duplicate code between components that could be shared
 - No unused imports or dead code increasing bundle
 - Tree-shaking effective (named imports, not barrel imports from large packages)

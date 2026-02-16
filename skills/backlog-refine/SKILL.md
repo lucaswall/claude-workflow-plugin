@@ -204,9 +204,7 @@ When the user confirms they're done refining:
 ...
 ```
 
-2. **Wait for confirmation** — Ask user to confirm before updating.
-
-3. **Apply updates:**
+2. **Apply updates immediately:**
    - Use `mcp__linear__update_issue` for each updated issue (title, description, priority, labels)
    - Use `mcp__linear__create_issue` for each new split issue with `team: "<discovered-team-name>"`, `state: "Backlog"`, and proper labels/priority
    - For canceled issues, follow the Cancellation Procedure below
@@ -299,7 +297,7 @@ When refining multiple issues:
 ## Rules
 
 - **Discussion-driven** — Always engage the user, don't auto-refine silently
-- **Confirm before updating** — Show preview of all changes before applying
+- **Show summary after updating** — Report what was changed
 - **Preserve user intent** — Refine the issue, don't change its fundamental purpose
 - **One issue at a time** — Keep discussion focused during analysis
 - **No code changes** — This skill only updates Linear issues
