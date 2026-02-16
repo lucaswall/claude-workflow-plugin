@@ -9,15 +9,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Installation:** `claude --add-dir /path/to/claude-workflow-plugin`
 **Skills invoked as:** `/lw-workflow:<skill-name>` (e.g., `/lw-workflow:plan-inline`)
 
+**Self-use:** Skills cannot be invoked from within this plugin project directly. To use a skill here (e.g., `tools-improve`), read its `SKILL.md` and references manually.
+
 ## Architecture
 
 ### Plugin Structure
 
 - `.claude-plugin/plugin.json` — Plugin manifest (name, version, author)
-- `agents/*.md` — Agent definitions (model, permissions, tools, instructions)
-- `skills/<name>/instructions.md` — Skill instructions (the prompt)
-- `skills/<name>/metadata.yml` — Skill metadata (triggers, invocation rules)
-- `skills/<name>/references/*.md` — Reference documents loaded by skills
+- `agents/*.md` — Agent definitions (YAML frontmatter + markdown instructions)
+- `skills/<name>/SKILL.md` — Skill definition (YAML frontmatter for metadata + markdown body for instructions)
+- `skills/<name>/references/*.md` — Supporting documents loaded by skills as needed
 
 ### Skill Categories
 
@@ -32,11 +33,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Agents
 
-| Agent | Model | Purpose |
-|-------|-------|---------|
-| **verifier** | Haiku | Runs tests/lint/build (3 modes: TDD filtered, Full, E2E) |
-| **pr-creator** | Sonnet | Creates PRs with Linear issue links |
-| **bug-hunter** | Sonnet | OWASP-based code review of git changes |
+| Agent | Model | Permission Mode | Purpose |
+|-------|-------|-----------------|---------|
+| **verifier** | Haiku | dontAsk | Runs tests/lint/build (3 modes: TDD filtered, Full, E2E) |
+| **pr-creator** | Sonnet | bypassPermissions | Creates PRs with Linear issue links |
+| **bug-hunter** | Sonnet | dontAsk | OWASP-based code review of git changes |
 
 ### Key Patterns
 
@@ -52,22 +53,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Modifying This Plugin
 
-**Always load `/lw-workflow:tools-improve` first** before creating or modifying skills/agents. It provides templates and reference docs for:
-- `skills-reference.md` — Skill metadata options, string substitutions (`$ARGUMENTS`, `$0`-`$N`)
-- `subagents-reference.md` — Agent definitions, model/permission options
+**IMPORTANT: Read `skills/tools-improve/SKILL.md` and its `references/` directory first** before creating or modifying skills/agents. It provides templates and reference docs for:
+- `skills-reference.md` — Skill frontmatter fields, string substitutions (`$ARGUMENTS`, `$0`-`$N`), progressive disclosure
+- `subagents-reference.md` — Agent definitions, permission modes, hooks, MCP access
 - `agent-teams-reference.md` — Team coordination patterns, task list, messaging
 - `claude-md-reference.md` — CLAUDE.md best practices for target projects
 
 ### Skill Conventions
 
-- Each skill is a directory under `skills/` with `instructions.md` and `metadata.yml`
-- Reference files go in `skills/<name>/references/` and are loaded via `$ref:` in metadata
-- Skills use progressive disclosure: metadata (layer 1) → instructions (layer 2) → references (layer 3)
-- MCP tool names are never hardcoded — discovered from CLAUDE.md or dynamically
+- Each skill is a directory under `skills/` with a single `SKILL.md` file (YAML frontmatter for metadata, markdown body for instructions)
+- Reference files go in `skills/<name>/references/` and are read by the skill instructions as needed
+- Skills use progressive disclosure: metadata (~100 tokens, always loaded) → instructions (<5k tokens, on trigger) → references (unlimited, on demand)
+- All skills set `disable-model-invocation: true` — user must invoke explicitly
+- Linear MCP tool names (e.g., `mcp__linear__*`) are listed in `allowed-tools` frontmatter for permissions, but skill instructions discover other MCPs dynamically from the target project's CLAUDE.md
 
 ### Agent Conventions
 
-- Each agent is a single `.md` file under `agents/`
-- Permission levels: `dontAsk` (auto-approved), `bypassPermissions` (full access)
+- Each agent is a single `.md` file under `agents/` (YAML frontmatter + markdown instructions)
+- Permission modes: `dontAsk` (auto-deny prompts, use for read-only agents), `bypassPermissions` (skip all checks)
 - Workers use Haiku for speed (verifier) or Sonnet for reasoning (pr-creator, bug-hunter)
 - Agent team workers are capped at 4; lead handles all MCP and Linear operations
