@@ -1,0 +1,14 @@
+{
+  "name": "lw-workflow",
+  "description": "Complete TDD development workflow with Linear integration, Railway deployment, code auditing, and agent team orchestration. Skills for planning, implementing, reviewing, and releasing TypeScript projects.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Lucas Wall",
+    "email": "wall.lucas@gmail.com"
+  },
+  "license": "CC-BY-4.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lucaswall/claude-workflow-plugin"
+  }
+}
