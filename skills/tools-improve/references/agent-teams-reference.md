@@ -128,9 +128,21 @@ Give the lead criteria: "only approve plans that include test coverage" or "reje
 
 ## Best Practices
 
-### 1. Partition Work by File Ownership
+### 1. Isolate Workers That Write Files
 
-**Never assign the same file to multiple teammates.** Two teammates editing the same file leads to overwrites. Break work so each teammate owns a distinct set of files.
+**Implementation teams** (workers that create/edit files) should each get an isolated **git worktree** — a separate working directory with its own branch, staging area, and `node_modules`. This eliminates file conflicts and enables **domain-based** task assignment (workers MAY touch overlapping files):
+
+```bash
+git worktree add _workers/worker-1 -b feat/<name>/worker-1
+cp -r node_modules _workers/worker-1/node_modules
+cp .env _workers/worker-1/.env 2>/dev/null || true
+```
+
+Workers commit to their own branches; the lead merges sequentially after all workers complete. Merge order: lower-level code first (types → services → routes → UI), with `npx tsc --noEmit` after each merge to catch integration issues.
+
+**Review teams** (read-only workers like code-audit, frontend-review) do NOT need worktrees. Reviewers only read files and report findings — they can all work in the same project directory safely.
+
+**Fallback for implementation teams:** If worktrees aren't feasible, partition by strict file ownership — never assign the same file to multiple teammates.
 
 ### 2. Give Teammates Enough Context
 

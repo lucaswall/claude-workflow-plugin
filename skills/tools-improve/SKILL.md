@@ -287,7 +287,7 @@ When a skill needs parallel workers (code review, parallel implementation, compe
 - Higher token cost is justified by speed or depth
 
 **Key rules for team-orchestrating skills:**
-1. **Partition by file ownership** — Never assign the same file to multiple teammates
+1. **Isolate workers that write files** — Implementation workers get git worktrees (`_workers/worker-N/`) with own branch; domain-based assignment allowed. Review-only workers (code-audit, frontend-review) share the main directory safely. **Fallback:** partition by file ownership if worktrees unavailable
 2. **Lead handles external writes** — Teammates lack MCP access; lead does Linear/Railway/etc.
 3. **Domain specialization** — Assign distinct domains, not "review the code" to everyone
 4. **Structured reporting** — Define a findings format so lead can merge and deduplicate

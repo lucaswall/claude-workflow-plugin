@@ -443,6 +443,33 @@ git push origin "v<version>"
 git checkout main
 ```
 
+### 5.7 Create GitHub Release
+
+Create a GitHub Release from the tag pushed in Phase 5.6. The release notes come from the changelog entry written in Phase 5.3.
+
+**Extract release notes** from `CHANGELOG.md` — the content between the new `## [version]` header and the next `## [` header (excluding both headers). This is the same section written in Phase 5.3.
+
+**Create the release:**
+
+```bash
+gh release create "v<version>" --title "v<version>" --notes "<release-notes>" --verify-tag
+```
+
+**Flags reference:**
+- `--verify-tag` — Abort if the tag doesn't exist on the remote (safety check)
+- `--title` — Release title (use the tag name, e.g., `v1.12.0`)
+- `--notes` — Release notes body (the changelog section content with `### Added`, `### Fixed`, etc.)
+- Do NOT use `--latest` — let GitHub auto-detect based on semver (default behavior is correct)
+- Do NOT use `--draft` or `--prerelease` — all releases from this skill are production releases
+
+**Error handling:** If `gh release create` fails, **do NOT stop the release**. Log a warning in the Phase 6 report:
+```
+**Warning:** GitHub Release creation failed: [error message]. Create manually with:
+gh release create "v<version>" --title "v<version>" --notes-file <(extract from CHANGELOG.md) --verify-tag
+```
+
+The git tag and deploy already succeeded — the GitHub Release is cosmetic and can be created manually later.
+
 ## Phase 6: Post-Release
 
 ### 6.1 Move Done Issues to Released
@@ -478,6 +505,7 @@ If the Linear MCP is unavailable (tools fail), **do not STOP** — log a warning
 **Backup:** _migrations/backup-YYYYMMDD-HHMMSS.dump
 **Migration:** [Applied successfully | No migration needed]
 **Data operations:** [Applied successfully (list queries) | None]
+**GitHub Release:** [Created | Failed (see warning above)]
 
 ### Issues Released
 [List of PROJ-xxx: title moved from Done → Released, or "None"]
@@ -523,6 +551,7 @@ If MIGRATIONS.md mentioned any environment variable changes, remind the user:
 | Docker not installed | STOP — install Docker |
 | Docker not running | Start Docker, then continue |
 | Invalid/lower version argument | STOP — must be valid semver higher than current |
+| GitHub Release creation fails | Warn in report — release succeeded, create manually later |
 
 ## Rules
 

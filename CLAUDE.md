@@ -45,7 +45,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Linear State Machine:** Backlog → Todo → In Progress → Review → Merge → Done → Released. Each skill moves issues through specific transitions.
 
-**Agent Team Orchestration:** Team skills (plan-implement, plan-review-implementation, code-audit, frontend-review) use `TeamCreate` to spawn parallel workers. File-ownership partitioning ensures no file is assigned to multiple workers. All team skills include single-agent fallback if `TeamCreate` fails.
+**Agent Team Orchestration:** Team skills (plan-implement, plan-review-implementation, code-audit, frontend-review) use `TeamCreate` to spawn parallel workers. Implementation workers (plan-implement) get isolated git worktrees with domain-based task assignment; review workers share the main directory. All team skills include single-agent fallback if `TeamCreate` fails.
 
 **TDD Loop:** Planning skills enforce test-first: write tests → verifier (expect fail) → implement → verifier (expect pass) → bug-hunter review.
 
