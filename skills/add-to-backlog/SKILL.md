@@ -46,7 +46,7 @@ User references findings from `investigate` skill:
 **Verify Linear MCP:** Call `mcp__linear__list_teams`. If unavailable, **STOP** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
 
 **Discover team name:** Read CLAUDE.md and look for LINEAR INTEGRATION section. Extract the team name from patterns like:
-- "Team: 'Food Scanner'"
+- "Team: 'ProjectName'"
 - "Team: ProjectName"
 
 If CLAUDE.md doesn't have a LINEAR INTEGRATION section, call `mcp__linear__list_teams` to discover the team name dynamically.

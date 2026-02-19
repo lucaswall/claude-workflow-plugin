@@ -14,7 +14,7 @@ Perform a comprehensive code audit using an agent team with domain-specialized r
 
 1. **Verify Linear MCP** — Call `mcp__linear__list_teams`. If unavailable, STOP and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
 2. **Discover project info from CLAUDE.md** — Read the LINEAR INTEGRATION section to find:
-   - Team name (e.g., "Food Scanner")
+   - Team name (e.g., "ProjectName")
    - Issue prefix (e.g., PROJ-xxx)
    - If LINEAR INTEGRATION section not found, call `mcp__linear__list_teams` to discover the team
 3. **Read CLAUDE.md** — Load project-specific rules to audit against (if exists)
