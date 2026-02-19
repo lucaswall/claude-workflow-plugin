@@ -47,8 +47,8 @@ Create a complete PR: analyze branch → commit local changes → push → PR.
 
 7. **Extract Linear issue IDs from PLANS.md** (if exists)
    - Read PLANS.md if present in project root
-   - Find the `**Linear Issues:**` line (may have single issue or comma-separated list)
-   - Extract all issue identifiers (pattern matches the project's Linear issue prefix, e.g., PROJ-123, FOO-456)
+   - Scan the ENTIRE file for all issue identifiers matching the project's Linear prefix pattern (e.g., `PROJ-\d+`) — not just specific lines. Issues appear in headers, Fix Plans, Linear Updates, task lists, everywhere.
+   - Deduplicate and sort numerically
    - Store for use in PR body (for Linear's magic keyword automation)
 
 ### Phase 2: Determine Actions
@@ -191,8 +191,8 @@ Closes PROJ-123, PROJ-124
 - This enables the workflow: Review → Merge (after code review) → Done (after PR merge)
 
 **Issue extraction:**
-- Look for `**Linear Issues:**` line in PLANS.md
-- Pattern: Issue identifier matching the project's prefix (extracted from CLAUDE.md or dynamically from the first issue found)
+- Scan the ENTIRE PLANS.md for all issue identifiers matching the project's Linear prefix (e.g., `PROJ-\d+`) — headers, Fix Plans, Linear Updates, task lists, everywhere
+- Deduplicate and sort numerically
 - If no issues found, omit the "Linear Issues" section entirely
 
 ## Rules

@@ -1,7 +1,7 @@
 ---
 name: plan-review-implementation
 description: QA review of completed implementation using an agent team with 3 domain-specialized reviewers (security, reliability, quality). Use after plan-implement finishes, or when user says "review the implementation". Moves Linear issues Review→Merge. Creates new issues in Todo for bugs found. Falls back to single-agent mode if agent teams unavailable.
-allowed-tools: Read, Edit, Glob, Grep, Bash, Task, TeamCreate, TeamDelete, SendMessage, TaskCreate, TaskUpdate, TaskList, TaskGet, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
+allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task, TeamCreate, TeamDelete, SendMessage, TaskCreate, TaskUpdate, TaskList, TaskGet, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
 disable-model-invocation: true
 ---
 
@@ -16,11 +16,7 @@ Review **ALL** implementation iterations that need review using an agent team wi
 1. **Read PLANS.md** — Understand the full plan and iteration history
 2. **Read CLAUDE.md** — Understand project standards and conventions
 3. **Verify Linear MCP** — Call `mcp__linear__list_teams`. If unavailable, STOP and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
-4. **Discover project info from CLAUDE.md** — Read the LINEAR INTEGRATION section to find:
-   - Team name (e.g., "Food Scanner")
-   - Issue prefix (e.g., PROJ-xxx)
-   - If LINEAR INTEGRATION section not found, call `mcp__linear__list_teams` to discover the team
-5. **Assess AI-generated code risk** — If implementation is large or shows AI patterns, apply extra scrutiny
+4. **Assess AI-generated code risk** — If implementation is large or shows AI patterns, apply extra scrutiny
 
 ## Linear State Management
 
@@ -29,7 +25,7 @@ This skill moves issues from **Review → Merge** (preparing for PR).
 **If task passes review (no issues):**
 - Move issue from "Review" to "Merge" using `mcp__linear__update_issue`
 
-**If task needs fixes (issues found):**
+**If task needs fixes (Fix Plan path):**
 - Move original issue from "Review" to "Merge" (the original task was completed)
 - Create NEW Linear issue(s) in "Todo" for each bug/fix using `mcp__linear__create_issue`:
   - `team`: [discovered from CLAUDE.md or list_teams]
@@ -37,6 +33,15 @@ This skill moves issues from **Review → Merge** (preparing for PR).
   - `labels`: Bug
 - Add new issue links to the Fix Plan section in PLANS.md
 - These new issues will go through the full cycle when plan-implement runs the Fix Plan
+
+**If task needs fixes (inline fix path — ≤3 S-size bugs):**
+- Move original issue from "Review" to "Merge" (the original task was completed)
+- Fix bugs inline with TDD (see Inline Fix Assessment)
+- Create NEW Linear issue(s) in "Merge" state for traceability using `mcp__linear__create_issue`:
+  - `team`: [discovered from CLAUDE.md or list_teams]
+  - `state`: "Merge" (already fixed)
+  - `labels`: Bug
+- No Fix Plan needed — bugs resolved in the same session
 
 ## Identify What to Review
 
@@ -64,7 +69,28 @@ If no iteration/plan needs review → Inform user and stop.
 
 From each iteration's "Tasks Completed This Iteration" (or legacy "Completed") section, list all files that were created, modified, or had tests added. This is the **review scope** — reviewers examine ONLY these files.
 
+## Review Scope Assessment
+
+Before spawning a review team, assess whether the overhead is justified. Three Sonnet reviewers each load full project context before reviewing — for small iterations, a single-agent sequential review is faster and cheaper.
+
+### Count Changed Files
+
+Count the unique files from "Collect Changed Files" above.
+
+### Decision
+
+| Changed files | Decision |
+|---|---|
+| ≤4 files | **Single-agent** — skip Team Setup, jump to Fallback: Single-Agent Mode |
+| 5+ files | **3 reviewers** — proceed to Team Setup |
+
+Announce: "N changed files — [single-agent/team] review mode."
+
+**Override:** If the iteration includes security-sensitive changes (auth, session, tokens, API keys, crypto), always use the team regardless of file count — security review benefits from a dedicated specialist lens.
+
 ## Team Setup
+
+**Skip this section if scope assessment chose single-agent mode** — jump to Fallback: Single-Agent Mode.
 
 ### Create the team
 
@@ -149,9 +175,81 @@ Every finding MUST be classified as either **FIX** or **DISCARD**. There is no "
 - "Low severity" — low severity bugs are still FIX, just with [low] tag
 - "Out of scope for this iteration" — the review scope is the changed files, and any bug found in them is in scope
 
+## Inline Fix Assessment
+
+After evaluating findings, assess whether small bugs can be fixed inline instead of creating a full Fix Plan + another implementation cycle. This applies in both team and single-agent review modes.
+
+### Step 1: Size each FIX finding
+
+| Size | Description | Examples |
+|---|---|---|
+| **S** | Single-line or few-line surgical fix | Add missing try/catch, fix condition, add validation, fix off-by-one, add `await`, add log field |
+| **M** | Moderate fix requiring investigation or multi-file changes | Refactor error handling, add timeout+retry, fix race condition |
+| **L** | Substantial redesign or new abstraction | Redesign async flow, add middleware, restructure component |
+
+### Step 2: Decision
+
+| Condition | Action |
+|---|---|
+| ALL fixes S-size AND count ≤ 3 | **Fix inline** — proceed to Step 3 |
+| Any M/L fix OR count > 3 | **Create Fix Plan** — skip to Document Findings |
+| No FIX findings | Skip — proceed to Document Findings |
+
+Announce: "N fix(es), all S-size — fixing inline." or "N fix(es) including M/L — creating Fix Plan."
+
+### Step 3: Fix Inline (if eligible)
+
+1. For each S-size fix, apply TDD:
+   - Write failing test → run (`npx vitest run "pattern"`) → implement fix → run → verify pass
+2. Run full test suite: `npm test`
+3. Run bug-hunter:
+   ```
+   Task tool with subagent_type "bug-hunter"
+   ```
+4. **If clean:** Proceed to Document Findings with "fixed inline" format
+5. **If bug-hunter finds new issues in the fixes:** Abandon inline approach — create Fix Plan as normal. Document the original findings plus new ones from bug-hunter.
+
+### Linear Handling for Inline Fixes
+
+Create Linear issues for traceability, but in "Merge" state (already fixed):
+- `mcp__linear__create_issue` with `state: "Merge"`, `labels: ["Bug"]`
+
+This preserves the audit trail without triggering the Todo → In Progress → Review workflow.
+
 ## Document Findings
 
-### If Issues Found (any that need fixing)
+### If Issues Found and Fixed Inline
+
+When the inline fix assessment determined bugs could be fixed directly:
+
+```markdown
+### Review Findings
+
+Summary: N issue(s) found, fixed inline ([single-agent review | Team: security, reliability, quality reviewers])
+- FIXED INLINE: X issue(s) — verified via TDD + bug-hunter
+
+**Issues fixed inline:**
+- [MEDIUM] BUG: Missing try/catch in API handler (`src/lib/service.ts:142`) — added error handling + test
+- [LOW] CONVENTION: Missing structured action field on log (`src/app/api/example/route.ts:55`) — added { action: "operation" }
+
+**Discarded findings (not bugs):**
+- [DISCARDED] ... (if any)
+
+### Linear Updates
+- PROJ-123: Review → Merge (original task)
+- PROJ-130: Created in Merge (Fix: missing try/catch — fixed inline)
+- PROJ-131: Created in Merge (Fix: missing log action — fixed inline)
+
+### Inline Fix Verification
+- Unit tests: all pass
+- Bug-hunter: no new issues
+
+<!-- REVIEW COMPLETE -->
+```
+
+No `## Fix Plan` is created — the bugs are already resolved. The iteration proceeds directly to the completion check.
+
+### If Issues Found (creating Fix Plan)
 
 Add Review Findings to the current Iteration section, then add Fix Plan at h2 level AFTER the iteration:
 
@@ -262,11 +360,11 @@ If there were no findings at all (clean review), a brief "No issues found" summa
 
 ### Determine Completion
 
-- **If Fix Plan exists OR tasks remain unfinished** → Do NOT mark complete. More implementation needed.
+- **If Fix Plan exists OR tasks remain unfinished** (and no inline fixes resolved all issues) → Do NOT mark complete. More implementation needed.
   1. **Commit and push** (see Termination section)
   2. Inform user: "Review complete. Changes committed and pushed. Run `/plan-implement` to continue implementation."
 
-- **If all tasks complete and no fix plans needed** → Run E2E tests, update header status, append final status, then create PR:
+- **If all tasks complete and no fix plans needed** (includes iterations where all bugs were fixed inline) → Run E2E tests, update header status, append final status, then create PR:
   1. **Run E2E tests** using the verifier agent in E2E mode:
      ```
      Use Task tool with subagent_type "verifier" with prompt "e2e"
@@ -291,15 +389,17 @@ All tasks implemented and reviewed successfully. All Linear issues moved to Merg
 
 ## Fallback: Single-Agent Mode
 
-If `TeamCreate` fails, perform the review as a single agent:
+If the scope assessment chose single-agent mode (≤4 changed files) OR `TeamCreate` fails, perform the review as a single agent:
 
-1. **Inform user:** "Agent teams unavailable. Running review in single-agent mode."
+1. **Inform user:** "N changed files — single-agent review mode." (or "Agent teams unavailable. Running review in single-agent mode." if TeamCreate failed)
 2. For each iteration needing review:
    a. Identify changed files from "Tasks Completed This Iteration"
    b. Read each file and apply checks from [references/code-review-checklist.md](references/code-review-checklist.md)
    c. Apply all domain checks (security, reliability, quality) sequentially
-   d. Document findings (same format as team mode)
-   e. Handle Linear updates (same as team mode)
+   d. Classify findings (same Merge & Evaluate Findings rules)
+   e. **Run Inline Fix Assessment** — same threshold applies (≤3 S-size fixes → fix inline)
+   f. Document findings (same format as team mode, including "fixed inline" format if applicable)
+   g. Handle Linear updates (same as team mode)
 3. Continue with "After ALL Iterations Reviewed" section
 
 ## Context Management & Continuation
@@ -338,6 +438,8 @@ If `TeamCreate` fails, perform the review as a single agent:
 | TeamCreate fails | Switch to single-agent fallback mode |
 | Reviewer stops without reporting | Send follow-up message, note domain as incomplete |
 | Too many issues found | Create fix plan for all real bugs; discard false positives with reasoning |
+| Inline fix test fails | Abandon inline approach — create Fix Plan for all findings (original + new) |
+| Inline fix introduces new bugs | Abandon inline approach — create Fix Plan with combined findings |
 
 ## Termination: Commit, Push, and PR
 
@@ -361,14 +463,14 @@ If `TeamCreate` fails, perform the review as a single agent:
 ## Rules
 
 - **Review ALL pending iterations** — Don't stop after one
-- **Do not modify source code** — Review only, document findings
+- **Do not modify source code during review** — Review only, document findings. Exception: when inline-fixing ≤3 S-size bugs (see Inline Fix Assessment), the lead applies TDD fixes directly after the review phase completes.
 - **Be specific** — Include file paths and line numbers for every issue
 - **One fix per issue** — Each finding must have a matching Fix task with Linear issue
 - **Fix Plan follows TDD** — Test first for each fix
 - **Never modify previous sections** — Only add to current iteration or append status
 - **Mark COMPLETE only when ALL iterations pass** — No fix plans pending, all reviewed
 - **Move issues to Merge** — All reviewed issues that pass go Review→Merge
-- **Create bug issues in Todo** — All bugs found create new issues in Todo state
+- **Create bug issues** — Fix Plan bugs → new issues in Todo state. Inline-fixed bugs → new issues in Merge state.
 - **Always commit and push at termination** — Never end without committing progress
 - **Create PR when plan is complete** — Use pr-creator subagent for final PR
 - **Lead handles all Linear/git writes** — Reviewers NEVER create issues or modify PLANS.md
@@ -378,3 +480,6 @@ If `TeamCreate` fails, perform the review as a single agent:
 - **Every finding is FIX or DISCARD** — No "document only" category. Real bugs at any severity get Linear issues + Fix Plan. Non-bugs get discarded with reasoning.
 - **Never discard real bugs** — Pre-existing, low-severity, or "already handled" are NOT valid reasons to discard. Only discard findings that are genuinely not bugs (false positive, impossible, style-only). When in doubt, FIX.
 - **Always report findings to user** — PLANS.md is overwritten by the next plan. The user must see all findings (fixed and discarded) directly in the conversation output before the skill terminates.
+- **Inline fix threshold: ≤3 S-size fixes** — When all FIX findings are S-size (surgical, single-line or few-line) and count ≤3, fix them inline with TDD instead of creating a Fix Plan. Abandon inline approach if tests fail or bug-hunter finds new issues.
+- **Inline fixes still get Linear issues** — Create issues in "Merge" state for traceability. Never skip the audit trail.
+- **Review scope assessment** — ≤4 changed files → single-agent review. 5+ files → 3 reviewers. Always use team for security-sensitive changes regardless of file count.

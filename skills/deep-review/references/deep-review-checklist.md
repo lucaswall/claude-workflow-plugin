@@ -203,7 +203,7 @@ When the reviewed feature involves Claude API integration, trace the full AI dat
 ### Prompt Caching
 
 - Static content (tools, system prompt) marked with `cache_control: {type: "ephemeral"}` for up to 90% input cost reduction and 85% latency reduction
-- Minimum cacheable length met: 1,024 tokens for Sonnet 4/4.5, 4,096 tokens for Opus 4.6/Haiku 4.5
+- Minimum cacheable length met: 1,024 tokens for Sonnet 4/4.5/4.6, 4,096 tokens for Opus 4.6/Haiku 4.5
 - In multi-turn conversations, final block of final message marked with `cache_control` each turn
 - Cache invalidation triggers understood: changing tool definitions invalidates entire cache; changing tool_choice/images/thinking invalidates message cache
 - `cache_creation_input_tokens` and `cache_read_input_tokens` monitored in responses
@@ -276,8 +276,8 @@ Follow data through the full AI pipeline:
 ### Model Configuration
 
 - `temperature` and `top_p` NOT used simultaneously (breaking change in Claude 4+)
-- For Opus 4.6: use `thinking: {type: "adaptive"}` with `output_config: {effort: "..."}` — manual `budget_tokens` deprecated
-- For Sonnet 4/4.5: use `thinking: {type: "enabled", budget_tokens: N}` when thinking desired
+- For Opus 4.6 and Sonnet 4.6: use `thinking: {type: "adaptive"}` with `output_config: {effort: "..."}` — manual `budget_tokens` deprecated. `effort` levels: `max` (Opus 4.6 only), `high` (default), `medium`, `low`
+- For older models (Sonnet 4, Sonnet 4.5, Opus 4.5): use `thinking: {type: "enabled", budget_tokens: N}` when thinking desired
 
 ### AI-Specific Security
 
