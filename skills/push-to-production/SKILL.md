@@ -14,7 +14,7 @@ Promote `main` to `release` with automated backup, migration assessment, and mer
 
 ### 1.1 Verify Linear MCP
 
-Call `mcp__linear__list_teams`. If unavailable, **STOP** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
+**ALWAYS call `mcp__linear__list_teams` directly.** Do NOT try to determine MCP availability by inspecting the tool list, checking settings, or reasoning about it — you MUST actually invoke the tool and check the result. If the call fails or returns an error, **STOP** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
 
 Extract the team name from the response (there should only be one team in most cases).
 
@@ -271,9 +271,13 @@ Wait for user confirmation.
 
 ### 4.1 Create Backup Directory
 
+Ensure `_migrations/` exists. Use Bash:
+
 ```bash
 mkdir -p _migrations
 ```
+
+**Note:** If `mkdir` triggers a permission prompt, the user should add `Bash(mkdir *)` to their allow list, or you can verify the directory exists with `ls _migrations` first and skip if it already does.
 
 ### 4.2 Get Production Database URL
 
@@ -305,14 +309,19 @@ If no migration is needed, skip this step — the service stays running during b
 
 ### 4.4 Dump Production Database
 
+Use two separate Bash calls to avoid permission pattern issues. First compute the filename, then run pg_dump with the literal path (no subshells in the pg_dump command):
+
 ```bash
-# Adjust pg_dump path based on OS
-pg_dump "$DATABASE_PUBLIC_URL" \
-  --format=custom \
-  --no-owner \
-  --no-privileges \
-  -f _migrations/backup-$(date +%Y%m%d-%H%M%S).dump
+date +%Y%m%d-%H%M%S
 ```
+
+Use the output to construct the filename `_migrations/backup-YYYYMMDD-HHMMSS.dump`, then run:
+
+```bash
+pg_dump "$DATABASE_PUBLIC_URL" --format=custom --no-owner --no-privileges -f _migrations/backup-YYYYMMDD-HHMMSS.dump
+```
+
+**Important:** Keep pg_dump as a single-line command starting with the full path. Multi-line `\` continuations and `$(...)` subshells can break Bash permission pattern matching against `Bash(/opt/homebrew/opt/libpq/bin/pg_dump *)`.
 
 Verify the dump file was created and is non-empty:
 
@@ -387,19 +396,20 @@ See [references/changelog-guidelines.md](references/changelog-guidelines.md) if 
 **Process:**
 
 1. Review the commit list from Phase 1.8
-2. Filter out purely internal changes (they get zero entries)
-3. Move any items from the `## [Unreleased]` section into the new version entry
-4. Write a `## [version] - YYYY-MM-DD` entry, grouping changes under these section headers (omit empty sections):
+2. **Determine the net effect against production** — use `git diff origin/release..origin/main --stat` (not the commit list) as the source of truth for what actually changed. Commits that introduce and fix the same issue within the cycle, or that rework/remove staging-only code, produce zero changelog entries. The commit list helps understand intent; the diff shows what's actually shipping.
+3. Filter out purely internal changes (they get zero entries)
+4. Move any items from the `## [Unreleased]` section into the new version entry
+5. Write a `## [version] - YYYY-MM-DD` entry, grouping changes under these section headers (omit empty sections):
    - `### Added` — new features, new screens
    - `### Changed` — changes to existing functionality, UI improvements
    - `### Deprecated` — features that will be removed in a future release
    - `### Removed` — removed features
    - `### Fixed` — bug fixes
    - `### Security` — security-related changes, vulnerability fixes
-5. Group minor fixes into single items (e.g., "Minor bug fixes" or "Minor UI polish")
-6. Keep each section concise — aim for 3-8 items total across all sections
-7. Insert the new entry between `## [Unreleased]` and the previous version (keep Unreleased section empty)
-8. Update the comparison links at the bottom of the file:
+6. Group minor fixes into single items (e.g., "Minor bug fixes" or "Minor UI polish")
+7. Keep each section concise — aim for 3-8 items total across all sections
+8. Insert the new entry between `## [Unreleased]` and the previous version (keep Unreleased section empty)
+9. Update the comparison links at the bottom of the file:
    - Discover the repository URL from git remote or CLAUDE.md
    - `[Unreleased]` link: compare new version tag to HEAD
    - New version link: compare previous version tag to new version tag
@@ -451,21 +461,35 @@ Create a GitHub Release from the tag pushed in Phase 5.6. The release notes come
 
 **Create the release:**
 
+First, write the release notes to a temporary file to avoid multi-line Bash command issues:
+
+```
+Use the Write tool to create _migrations/release-notes.md with the extracted changelog content
+```
+
+Then create the release using `--notes-file` (avoids multi-line `--notes` strings that break Bash permission patterns):
+
 ```bash
-gh release create "v<version>" --title "v<version>" --notes "<release-notes>" --verify-tag
+gh release create "v<version>" --title "v<version>" --notes-file _migrations/release-notes.md --verify-tag
+```
+
+Clean up the temp file after:
+
+```bash
+rm -f _migrations/release-notes.md
 ```
 
 **Flags reference:**
 - `--verify-tag` — Abort if the tag doesn't exist on the remote (safety check)
 - `--title` — Release title (use the tag name, e.g., `v1.12.0`)
-- `--notes` — Release notes body (the changelog section content with `### Added`, `### Fixed`, etc.)
+- `--notes-file` — Read release notes from file (preferred over `--notes` to avoid multi-line Bash issues)
 - Do NOT use `--latest` — let GitHub auto-detect based on semver (default behavior is correct)
 - Do NOT use `--draft` or `--prerelease` — all releases from this skill are production releases
 
 **Error handling:** If `gh release create` fails, **do NOT stop the release**. Log a warning in the Phase 6 report:
 ```
 **Warning:** GitHub Release creation failed: [error message]. Create manually with:
-gh release create "v<version>" --title "v<version>" --notes-file <(extract from CHANGELOG.md) --verify-tag
+gh release create "v<version>" --title "v<version>" --notes-file _migrations/release-notes.md --verify-tag
 ```
 
 The git tag and deploy already succeeded — the GitHub Release is cosmetic and can be created manually later.

@@ -455,8 +455,14 @@ If the scope assessment chose single-agent mode (≤4 changed files) OR `TeamCre
 1. Stage modified files: `git status --porcelain=v1`, then `git add <file> ...` — **skip** `.env*`, `*.key`, `*.pem`, `credentials*`, `secrets*`
 2. Commit (no `Co-Authored-By` tags): `plan: mark [plan-name] complete`
 3. `git push`
-4. Create PR using the `pr-creator` subagent
-5. Inform user with PR URL
+4. **Collect ALL Linear issue identifiers** managed during this session:
+   - Original plan issues (from PLANS.md header)
+   - Issues moved Review → Merge during review
+   - Inline-fix issues created in Merge state
+   - Fix-plan issues that completed and were moved to Merge
+   Deduplicate and sort numerically. Format as: `PROJ-123, PROJ-124, ...`
+5. Create PR using the `pr-creator` subagent. **Include in the prompt:** `Linear issues to close: PROJ-123, PROJ-124, ...` with the full list from step 4. This overrides PLANS.md scanning and ensures no inline-fix issues are missed.
+6. Inform user with PR URL
 
 **Branch handling:** Assumes plan-implement already created a feature branch. If on `main`, create branch first.
 
