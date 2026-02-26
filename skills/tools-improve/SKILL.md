@@ -18,15 +18,15 @@ You create and optimize Claude Code subagents, skills, and CLAUDE.md files.
 4. **Update CLAUDE.md** - Add new skill/agent to the SKILLS or SUBAGENTS table
 5. **Verify** - Confirm description triggers correctly for auto-discovery
 
-**For CLAUDE.md:** Read [references/claude-md-reference.md](references/claude-md-reference.md) for the full review checklist and inclusion/exclusion criteria (sourced from Anthropic official docs).
+**For CLAUDE.md:** Read [references/claude-md-reference.md](references/claude-md-reference.md) for the full review checklist, `@import` syntax, and inclusion/exclusion criteria (sourced from Anthropic official docs).
 
 ## Reference Docs
 
 For detailed information beyond this file:
-- [references/claude-md-reference.md](references/claude-md-reference.md) - CLAUDE.md include/exclude criteria, review checklist, modular organization
-- [skills-reference.md](skills-reference.md) - Invocation control, context budget, hooks, progressive disclosure, testing, troubleshooting
-- [subagents-reference.md](subagents-reference.md) - Built-in agents, permission modes, hook events, MCP access, memory, resume
-- [agent-teams-reference.md](agent-teams-reference.md) - Team orchestration, task coordination, display modes, troubleshooting
+- [references/claude-md-reference.md](references/claude-md-reference.md) - CLAUDE.md include/exclude criteria, review checklist, `@import` syntax, modular organization
+- [references/skills-reference.md](references/skills-reference.md) - Invocation control, context budget, hooks, progressive disclosure, testing, troubleshooting
+- [references/subagents-reference.md](references/subagents-reference.md) - Built-in agents, permission modes, hook events, MCP access, memory, resume
+- [references/agent-teams-reference.md](references/agent-teams-reference.md) - Team orchestration, task coordination, display modes, troubleshooting
 
 ## Decision: Skill vs Subagent
 
@@ -44,12 +44,12 @@ For detailed information beyond this file:
 
 **Default to skill** - simpler, runs in main context.
 
-**When a skill needs parallel workers**, it can orchestrate an **agent team** internally. See "Agent Teams in Skills" under Best Practices and [agent-teams-reference.md](agent-teams-reference.md) for the full guide.
+**When a skill needs parallel workers**, it can orchestrate an **agent team** internally. See "Agent Teams in Skills" under Best Practices and [references/agent-teams-reference.md](references/agent-teams-reference.md) for the full guide.
 
 ## Templates
 
 ### Skill Template
-Create `.claude/skills/<name>/SKILL.md`:
+Create `.claude/skills/<name>/SKILL.md` (project-level) or `skills/<name>/SKILL.md` (plugin-level):
 ```yaml
 ---
 name: my-skill
@@ -71,7 +71,7 @@ my-skill/
 ```
 
 ### Subagent Template
-Create `.claude/agents/<name>.md`:
+Create `.claude/agents/<name>.md` (project-level) or `agents/<name>.md` (plugin-level):
 ```yaml
 ---
 name: my-agent
@@ -116,7 +116,9 @@ You are a specialist in [domain]. When invoked:
 | `skills` | Preload full skill content at startup |
 | `mcpServers` | MCP servers available (name reference or inline config) |
 | `memory` | Persistent memory scope: `user`, `project`, or `local` |
-| `hooks` | PreToolUse, PostToolUse, Stop |
+| `background` | `true` = always run as background task (concurrent, no MCP) |
+| `isolation` | `worktree` = run in temporary git worktree (auto-cleaned if no changes) |
+| `hooks` | PreToolUse, PostToolUse, Stop (SubagentStart/SubagentStop in settings.json only) |
 
 ### String Substitutions (Skills)
 | Variable | Description |
@@ -212,6 +214,18 @@ if echo "$CMD" | grep -iE '\b(INSERT|UPDATE|DELETE|DROP)\b' >/dev/null; then
 fi
 exit 0
 ```
+
+### Hook Types
+
+Hooks support three types beyond shell commands:
+
+| Type | Use For | Example |
+|------|---------|---------|
+| `command` | Shell script validation | `"command": "./scripts/validate.sh"` |
+| `prompt` | LLM yes/no decision (uses Haiku) | `"prompt": "Check if all tasks are complete"` |
+| `agent` | Multi-turn validation with tool access | `"prompt": "Run tests and verify", "timeout": 120` |
+
+`prompt` and `agent` hooks return structured JSON with `permissionDecision`: `"allow"`, `"deny"`, or `"ask"`.
 
 ## Best Practices
 
@@ -324,5 +338,7 @@ For complete reference, see:
 - Skills: https://code.claude.com/docs/en/skills
 - Subagents: https://code.claude.com/docs/en/sub-agents
 - Agent Teams: https://code.claude.com/docs/en/agent-teams
+- Hooks: https://code.claude.com/docs/en/hooks-guide
+- Best Practices: https://code.claude.com/docs/en/best-practices
 
-**Local references:** See [skills-reference.md](skills-reference.md), [subagents-reference.md](subagents-reference.md), and [agent-teams-reference.md](agent-teams-reference.md) for quick lookup tables.
+**Local references:** See [references/skills-reference.md](references/skills-reference.md), [references/subagents-reference.md](references/subagents-reference.md), and [references/agent-teams-reference.md](references/agent-teams-reference.md) for detailed lookup tables.

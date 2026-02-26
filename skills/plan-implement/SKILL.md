@@ -32,6 +32,7 @@ For each pending task/fix, estimate its size:
 
 | Size | Description | Examples |
 |------|-------------|---------|
+| **0** | No TypeScript code — docs, config, skill files only | Update CLAUDE.md, edit .env.example, modify SKILL.md |
 | **S** | Single-line or few-line surgical change | Replace one API call, add try/catch, add an attribute, fix a condition |
 | **M** | Moderate implementation with tests | New error state with tests, add timeout+logging to multiple calls |
 | **L** | Substantial new code or multi-file feature | New component, new API route, refactor a module, implement a protocol |
@@ -39,7 +40,7 @@ For each pending task/fix, estimate its size:
 ### Step 2: Compute effective scope
 
 1. **Count independent work units** — Group tasks that share files into a single unit. E.g., two fixes both touching `claude.ts` = 1 unit, not 2.
-2. **Estimate total effort** — Sum the task sizes: S=1, M=2, L=4.
+2. **Estimate total effort** — Sum the task sizes: 0=0, S=1, M=2, L=4.
 
 ### Step 3: Decision
 
@@ -218,6 +219,11 @@ TOOL USAGE (memorize — no exceptions):
 Using Bash for file operations (including reads like ls, find, grep) triggers
 permission prompts on the lead's terminal. Use the dedicated tools above.
 
+CRITICAL: Only edit files INSIDE your worktree directory ({absolute_project_path}/_workers/worker-{N}/).
+NEVER edit files in the main project directory ({absolute_project_path}/src/...). Your worktree
+has its own complete copy of the codebase. If you see paths without `_workers/worker-{N}` in them,
+you are editing the wrong files.
+
 RULES:
 - TDD: write failing test → run (expect fail) → implement → run (expect pass). See CLAUDE.md.
 - Tests: `npx vitest run "pattern"` only. NEVER run npm test, npm run build, or E2E tests.
@@ -362,11 +368,12 @@ git -C _workers/worker-N add -A -- ':!node_modules' ':!.env' ':!.env.local'
 git -C _workers/worker-N commit -m "lead: salvage worker-N uncommitted progress"
 ```
 
-### 2. Shutdown Workers
+### 2. Shutdown Workers and Delete Team
 
 1. Send shutdown requests to all workers using `SendMessage` with `type: "shutdown_request"`
 2. Wait for shutdown confirmations — timeout after 2 minutes per worker
 3. Mark all work unit tasks as completed via `TaskUpdate`
+4. **Delete the team immediately:** `TeamDelete` — the team is no longer needed after workers are done. Deleting it now prevents bug-hunter/verifier from accidentally joining as team members.
 
 **CRITICAL: Never delete worktrees while workers are alive.** Worktree deletion is IRREVERSIBLE and destroys all uncommitted worker progress. The sequence MUST be: shutdown all workers → verify all confirmed → THEN delete worktrees in the Cleanup phase.
 
@@ -393,8 +400,9 @@ If type errors → fix them before merging the next worker. This catches integra
 **If a merge has conflicts:**
 1. Review the conflicting files — understand both workers' intent from the plan
 2. Resolve conflicts, keeping correct logic from both sides
-3. `git add` resolved files, then `git commit` (git's auto-generated merge message is fine)
-4. Run `npm run typecheck` before continuing to the next merge
+3. **Verify no conflict markers remain:** `grep -rn '<<<<<<\|======\|>>>>>>' <resolved-files>` — fix any stray markers before committing
+4. `git add` resolved files, then `git commit` (git's auto-generated merge message is fine)
+5. Run `npm run typecheck` before continuing to the next merge
 
 **If `git merge` fails entirely** (e.g., worktree artifacts like committed symlinks):
 1. Fall back to cherry-pick: `git cherry-pick <FEATURE_BRANCH>-worker-N --no-commit`
@@ -558,9 +566,7 @@ git worktree list
 
 Should show only the main worktree. If stale entries remain, run `git worktree prune` again.
 
-### 6. Delete Team Resources
-
-Use `TeamDelete` to remove team resources.
+**Note:** `TeamDelete` was already called in the Post-Worker Phase (step 2). If it wasn't called there for any reason, call it now.
 
 ## Fallback: Single-Agent Mode
 
@@ -659,12 +665,13 @@ If `TeamCreate` fails or worktree setup fails, implement the plan sequentially a
 - **Lead runs all CLI generators** — Drizzle-kit, prisma generate, etc. reserved for lead post-merge
 - **Workers test via vitest only** — `npx vitest run "pattern"` in their worktree. No build, no full suite, no E2E.
 - **E2E test tasks are write-only for workers** — Workers write specs but do NOT run them
-- **Foundation-first merge order** — Merge lower-level workers first (types → services → routes → UI). Typecheck gate (`npm run typecheck`) after each merge.
+- **Foundation-first merge order** — Merge lower-level workers first (types → services → routes → UI). Typecheck gate (`npm run typecheck`) after each merge. After resolving conflicts, always verify no stray `<<<<<<` markers remain.
 - **Workers commit, don't push** — Workers `git add -A && git commit` in their worktree. Lead merges locally via the shared git object database.
+- **Docs tasks need explicit values** — When a docs-only worker must document another worker's implementation details (column names, status values, etc.), include the exact values in the worker's prompt. Don't rely on the worker inferring them from the plan.
 - **Never delete worktrees while workers are alive** — Worktree deletion is irreversible. Always shutdown workers first, then verify shutdown, then delete worktrees.
 - **Respect the 5-minute grace period** — Workers need multiple turns to start. Do not send status checks or take corrective action before 5 minutes have passed.
-- **Small batches skip workers** — Use the effort-point scoring (S=1, M=2, L=4) to decide. Single-agent when: 1 work unit, ≤6 total points, or 7–11 points with <3 units. Worker overhead exceeds implementation time for small batches.
+- **Small batches skip workers** — Use the effort-point scoring (0=0, S=1, M=2, L=4) to decide. Single-agent when: 1 work unit, ≤6 total points, or 7–11 points with <3 units. Docs-only tasks (CLAUDE.md, .env, skill files) score 0 — they don't justify worker overhead.
 - **Always clean up worktrees** — Remove worktrees, prune metadata, delete worker branches after merge
 - **No co-author attribution** — Commit messages must NOT include `Co-Authored-By` tags
 - **Never stage sensitive files** — Skip `.env*`, `*.key`, `*.pem`, `credentials*`, `secrets*`
-- **Log migrations in MIGRATIONS.md** — Workers report migration-relevant changes to lead; lead appends to MIGRATIONS.md
+- **Log migrations in MIGRATIONS.md** — Workers report migration-relevant changes to lead; lead appends to MIGRATIONS.md. All schema/folder changes MUST include migration logic (startup detection + automatic migration) — never ship a breaking change to persistent data without a migration path.

@@ -99,7 +99,11 @@ git rev-parse --verify origin/release
 
 If `release` branch doesn't exist, **STOP** and tell the user to create it.
 
-### 1.8 Diff Assessment
+### 1.8 Check for Pending PLANS.md
+
+Read `PLANS.md` from project root (if it exists). If it contains incomplete tasks (tasks not marked as done), **STOP**: "There are incomplete tasks in PLANS.md. Finish implementation first or clear the plan before releasing."
+
+### 1.9 Diff Assessment
 
 Check what's changing between `release` and `main`:
 
@@ -111,6 +115,8 @@ git diff origin/release..origin/main --stat
 If there are no commits to promote, **STOP**: "Nothing to promote. `main` and `release` are identical."
 
 Show the user the commit list and file diff summary.
+
+**First release (no prior tags):** If `git describe --tags` fails, this is the first tagged release. Use the full commit history and treat the current `package.json` version as the starting version.
 
 ## Phase 2: Assess Migrations
 
@@ -382,7 +388,7 @@ Log potential production data migrations here during development. These notes ar
    - Validate it's valid semver (X.Y.Z)
    - Validate it's strictly higher than current version
    - If invalid, **STOP**: "Invalid version. Must be higher than current [current]."
-3. If no argument, **deduce the bump from the commits being promoted** (from Phase 1.8):
+3. If no argument, **deduce the bump from the commits being promoted** (from Phase 1.9):
    - **MAJOR** (`x+1.0.0`): Incompatible/breaking changes — removed or renamed API routes, changed API response shapes, DB schema changes that break existing clients, removed features
    - **MINOR** (`x.y+1.0`): Backward-compatible new functionality — new screens, new API endpoints, new features, significant UI additions
    - **PATCH** (`x.y.z+1`): Backward-compatible bug fixes — bug fixes, UI tweaks, refactoring, performance improvements, documentation, dependency updates
@@ -395,7 +401,7 @@ See [references/changelog-guidelines.md](references/changelog-guidelines.md) if 
 
 **Process:**
 
-1. Review the commit list from Phase 1.8
+1. Review the commit list from Phase 1.9
 2. **Determine the net effect against production** — use `git diff origin/release..origin/main --stat` (not the commit list) as the source of truth for what actually changed. Commits that introduce and fix the same issue within the cycle, or that rework/remove staging-only code, produce zero changelog entries. The commit list helps understand intent; the diff shows what's actually shipping.
 3. Filter out purely internal changes (they get zero entries)
 4. Move any items from the `## [Unreleased]` section into the new version entry
@@ -496,25 +502,31 @@ The git tag and deploy already succeeded — the GitHub Release is cosmetic and 
 
 ## Phase 6: Post-Release
 
-### 6.1 Move Done Issues to Released
+### 6.1 Move Issues to Released
 
-Transition all Linear issues in "Done" to "Released" now that the code is live in production.
+Transition all Linear issues in "Done" or "Merge" to "Released" now that the code is live in production.
 
-1. Query all issues in Done state:
+1. Look up the Released state UUID using `mcp__linear__list_issue_statuses` with team name. Find the status with `name: "Released"` (or similar — check what states exist in the team).
+
+2. Query issues stuck in "Merge" state (PR was merged but Linear automation didn't fire):
+   ```
+   mcp__linear__list_issues with team: "<discovered-team-name>", state: "Merge"
+   ```
+
+3. Query all issues in "Done" state:
    ```
    mcp__linear__list_issues with team: "<discovered-team-name>", state: "Done"
    ```
 
-2. Look up the Released state UUID using `mcp__linear__list_issue_statuses` with team name. Find the status with `name: "Released"` (or similar — check what states exist in the team).
-
-3. For each issue found, transition to Released using the **state UUID** (both Done and Released are `type: completed` — passing by name could silently no-op):
+4. For each issue found (from both queries), transition to Released using the **state UUID** (both Done and Released are `type: completed` — passing by name could silently no-op):
    ```
    mcp__linear__update_issue with id: <issue-id>, state: "<released-state-uuid>"
    ```
+   **Batch efficiently:** Call up to 10 `update_issue` calls in parallel. If there are more than 30 issues, update the first 30 and note the remainder in the report for manual transition.
 
-4. Collect the list of moved issues (identifier + title) for the report.
+5. Collect the list of moved issues (identifier + title) for the report.
 
-If no issues are in Done, that's fine — skip silently.
+If no issues are in Done or Merge, that's fine — skip silently.
 
 If the Linear MCP is unavailable (tools fail), **do not STOP** — log a warning in the report and continue. The release itself succeeded; issue state is cosmetic.
 
@@ -532,7 +544,7 @@ If the Linear MCP is unavailable (tools fail), **do not STOP** — log a warning
 **GitHub Release:** [Created | Failed (see warning above)]
 
 ### Issues Released
-[List of PROJ-xxx: title moved from Done → Released, or "None"]
+[List of PROJ-xxx: title moved from Done/Merge → Released, or "None"]
 
 ### Environment Variable Changes
 [List any env var renames/additions from MIGRATIONS.md, or "None"]
@@ -561,6 +573,7 @@ If MIGRATIONS.md mentioned any environment variable changes, remind the user:
 | Dirty working tree | STOP — commit or stash |
 | Behind remote | STOP — pull latest |
 | Build/tests fail | STOP — fix before releasing |
+| Incomplete tasks in PLANS.md | STOP — finish implementation first |
 | No commits to promote | STOP — nothing to do |
 | DB backup fails | STOP — never release without backup |
 | Complex migration | STOP — discuss with user |
