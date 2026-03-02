@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-`lw-workflow` is a Claude Code plugin providing a complete TDD development workflow. It consists of 15 skills and 3 agents orchestrating planning, implementation, review, auditing, and release of TypeScript projects. There is no build system — the plugin is pure markdown.
+`lw-workflow` is a Claude Code plugin providing a complete TDD development workflow. It consists of 16 skills and 3 agents orchestrating planning, implementation, review, auditing, and release of TypeScript projects. There is no build system — the plugin is pure markdown.
 
 **Installation:** `claude --add-dir /path/to/claude-workflow-plugin`
 **Skills invoked as:** `/lw-workflow:<skill-name>` (e.g., `/lw-workflow:plan-inline`)
@@ -27,7 +27,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | **Planning** | plan-inline, plan-fix, plan-backlog, add-to-backlog, backlog-refine | Create TDD plans, manage Linear issues |
 | **Implementation** | plan-implement, plan-review-implementation | Execute plans with agent teams, QA review |
 | **Auditing** | code-audit, frontend-review, deep-review | Security/quality/UX audits with multi-reviewer teams |
-| **Research** | investigate, pull-from-roadmap | Read-only investigation, feature research |
+| **Research** | investigate, pull-from-roadmap, push-to-roadmap | Read-only investigation, feature research, roadmap authoring |
 | **Release** | push-to-production | DB backup, migration, deploy |
 | **Meta** | tools-improve, tools-migrate | Best practices for modifying this plugin, bidirectional skill/agent migration |
 
