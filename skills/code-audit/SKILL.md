@@ -1,8 +1,8 @@
 ---
 name: code-audit
-description: Audits codebase using an agent team with 3 domain-specialized reviewers (security, reliability, quality). Creates Linear issues in Backlog state for findings. Use when user says "audit", "find bugs", "check security", "review codebase", or "team audit". Higher token cost, faster and deeper analysis. Falls back to single-agent mode if agent teams unavailable.
+description: Audits codebase using an agent team with 3 domain-specialized reviewers (security, reliability, quality). Triages open Sentry issues (creates Linear issues for real bugs, resolves/ignores noise). Creates Linear issues in Backlog state for findings. Use when user says "audit", "find bugs", "check security", "review codebase", or "team audit". Higher token cost, faster and deeper analysis. Falls back to single-agent mode if agent teams unavailable.
 argument-hint: [optional: specific area like "lib" or "api"]
-allowed-tools: Read, Glob, Grep, Task, Bash, TeamCreate, TeamDelete, SendMessage, TaskCreate, TaskUpdate, TaskList, TaskGet, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
+allowed-tools: Read, Glob, Grep, Task, Bash, TeamCreate, TeamDelete, SendMessage, TaskCreate, TaskUpdate, TaskList, TaskGet, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses, mcp__sentry__find_organizations, mcp__sentry__find_projects, mcp__sentry__search_issues, mcp__sentry__get_issue_details, mcp__sentry__analyze_issue_with_seer, mcp__sentry__update_issue
 disable-model-invocation: true
 ---
 
@@ -29,6 +29,8 @@ Perform a comprehensive code audit using an agent team with domain-specialized r
    - Use Glob with patterns from tsconfig.json `include` to identify source directories
    - If no tsconfig, use conventions: `src/`, `lib/`, `app/`, `packages/`
 6. **Run `npm audit`** — Capture critical/high dependency vulnerabilities for later
+7. **Discover Sentry context** — Call `mcp__sentry__find_organizations` to discover org slug, then `mcp__sentry__find_projects` with org slug to find the project. If Sentry MCP unavailable, skip Sentry triage later (warn user).
+8. **Fetch unresolved Sentry issues** — Call `mcp__sentry__search_issues` with org slug and project slug, query: "unresolved issues". Record each issue's ID, title, URL, event count, user count, last seen date. If none found, skip Sentry Triage phase later.
 
 ## Team Setup
 
@@ -80,6 +82,9 @@ RULES:
 - Be specific — include file paths and approximate line numbers
 - Be thorough — check every file in scope
 - Focus area: {$ARGUMENTS or "entire codebase"}
+
+PROJECT CONTEXT:
+{Summarize from CLAUDE.md: language, framework, build tool, test framework, architecture pattern, source/test paths, key libraries/SDKs}
 
 WORKFLOW:
 1. Read CLAUDE.md for project-specific rules
@@ -206,8 +211,8 @@ Search patterns (use Grep):
 - `@ts-ignore|@ts-expect-error` — suppressed type errors
 - `console\.log|console\.warn|console\.error` — should use proper logger (CLAUDE.md may allow in client components)
 - `catch\s*\([^)]*\)\s*\{[^}]*\}` — empty catch blocks
-- `stop_reason` — verify all values handled
-- `max_tokens` — verify reasonable limits
+- `stop_reason` — verify all values handled (if AI integration exists)
+- `max_tokens` — verify reasonable limits (if AI integration exists)
 ```
 
 ## Coordination (while reviewers work)
@@ -303,9 +308,64 @@ labels: [Mapped label(s)]
 - Include file paths with line numbers in Context
 - One issue per distinct finding
 
+## Sentry Triage
+
+After creating Linear issues from audit findings, triage all unresolved Sentry issues discovered in pre-flight. The lead handles this directly (not reviewers).
+
+**Skip this section if:** Sentry MCP was unavailable during pre-flight, or no unresolved Sentry issues were found.
+
+### For each unresolved Sentry issue:
+
+1. **Get details** — Call `mcp__sentry__get_issue_details` to get the full stacktrace and context
+2. **Locate in codebase** — Read the referenced files/lines from the stacktrace
+3. **Cross-reference** — Check if:
+   - An audit finding already covers this issue (from the reviewer phase)
+   - A Linear issue already exists for this (from pre-flight backlog query)
+4. **Decide disposition:**
+
+| Disposition | When | Action |
+|---|---|---|
+| **Fix needed** | Real bug in current code, not yet tracked | Create Linear issue with Sentry link (see format below) |
+| **Already tracked** | Linear issue already exists for this | Skip — note in report |
+| **Already covered** | Audit finding already captures this | Skip — audit finding handles it |
+| **Already fixed** | Code has been changed, or a completed plan already addresses it | `mcp__sentry__update_issue` with `status: "resolved"` |
+| **Noise/transient** | One-off error, expected behavior, test data, transient network issue | `mcp__sentry__update_issue` with `status: "ignored"` |
+
+### Linear Issue Format (for fix-needed Sentry issues)
+
+Use `mcp__linear__create_issue` following the add-to-backlog pattern:
+
+```
+team: [discovered team name]
+state: "Backlog"
+title: "[Brief description from Sentry issue]"
+priority: [1|2|3|4] based on event count, user impact, severity
+labels: [Bug]
+```
+
+**Description format:**
+
+```
+**Problem:**
+[What is happening — from Sentry stacktrace and context]
+
+**Sentry Issue:**
+[Sentry issue URL] — [event count] events, [user count] users, last seen [date]
+
+**Context:**
+[Affected file paths with line numbers from stacktrace]
+
+**Impact:**
+[User-facing impact based on event frequency and severity]
+
+**Acceptance Criteria:**
+- [ ] [Specific fix criterion]
+- [ ] Error no longer appears in Sentry after fix deployed
+```
+
 ## Shutdown Team
 
-After all Linear issues are created:
+After all Linear issues are created and Sentry triage is complete:
 1. Send shutdown requests to all 3 reviewers using `SendMessage` with `type: "shutdown_request"`
 2. Wait for shutdown confirmations
 3. Use `TeamDelete` to remove team resources
@@ -329,6 +389,7 @@ If `TeamCreate` fails (agent teams unavailable), perform the audit sequentially 
 4. **CLAUDE.md compliance** — Check project-specific rules
 5. **Merge, deduplicate, reprioritize** — Same process as team mode (see Merge & Deduplicate section)
 6. **Create Linear issues** — Same process as team mode (see Create Linear Issues section)
+7. **Sentry triage** — Same process as team mode (see Sentry Triage section)
 
 ## Error Handling
 
@@ -345,6 +406,10 @@ If `TeamCreate` fails (agent teams unavailable), perform the audit sequentially 
 | Referenced file no longer exists | Mark issue as `fixed`, close in Linear |
 | Cannot determine if issue is fixed | Keep as `still_valid` |
 | Large codebase (>1000 files) | Tell reviewers to focus on `$ARGUMENTS` area or entry points |
+| Sentry MCP not connected | Skip Sentry triage, warn user |
+| No unresolved Sentry issues | Skip Sentry triage phase |
+| Sentry issue references deleted file | Mark as `resolved` |
+| Cannot determine if Sentry issue is fixed | Create Linear issue to investigate |
 
 ## Rules
 
@@ -353,6 +418,8 @@ If `TeamCreate` fails (agent teams unavailable), perform the audit sequentially 
 - **Lead handles all Linear writes** — Reviewers NEVER create issues directly
 - **Deduplicate before creating** — No duplicate issues in Linear
 - **Be thorough** — Every file in scope must be checked
+- **Sentry triage is lead-only** — Reviewers never interact with Sentry; the lead triages all Sentry issues after merging audit findings
+- **Sentry issues that need fixes get Linear issues** — Always include the Sentry issue URL in the description so downstream planning skills can track it
 
 ## Termination
 
@@ -380,6 +447,18 @@ Output this report and STOP:
 | ... | ... | ... | ... | ... |
 
 X issues total | Duplicates merged: M | Findings dropped: N
+
+### Sentry Triage
+
+| # | Sentry Issue | Disposition | Action |
+|---|---|---|---|
+| 1 | PROJ-SENTRY-N | Fix needed | Created PROJ-XX in Backlog |
+| 2 | PROJ-SENTRY-N | Already fixed | Resolved in Sentry |
+| 3 | PROJ-SENTRY-N | Noise | Ignored in Sentry |
+| ... | ... | ... | ... |
+
+[OR: No unresolved Sentry issues found.]
+[OR: Sentry MCP unavailable — triage skipped.]
 
 Next step: Review Backlog in Linear and use `plan-backlog` to create implementation plans.
 ```

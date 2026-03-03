@@ -140,4 +140,5 @@ Search patterns (use Grep on changed files):
 - `as unknown as` — double cast
 - `@ts-ignore|@ts-expect-error` — suppressed type errors
 - `console\.log|console\.warn|console\.error` — should use proper logger
+- `TODO|FIXME|HACK` — unresolved items
 ```

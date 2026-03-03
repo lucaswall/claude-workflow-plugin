@@ -56,6 +56,7 @@ Apply this checklist:
 7. **Stale content?** → Cross-check tables/lists against actual files (agents, DB tables, components)
 8. **Emphasis on critical rules?** → Use "IMPORTANT" or "YOU MUST" for rules that must not be ignored
 9. **Checked into git?** → CLAUDE.md should be in version control for team sharing
+10. **Test by subtraction** → For each line, remove it and ask: "Would Claude make mistakes without this?" If not, cut it. Instruction-following quality degrades as instruction count increases.
 
 ## When Adding to CLAUDE.md
 

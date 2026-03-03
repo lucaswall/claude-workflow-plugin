@@ -25,6 +25,14 @@
 
 **Restrict spawnable agents** — Use `Task(type1, type2)` in the `tools` field to allowlist which agent types can be spawned (only applies to agents running as main thread with `claude --agent`).
 
+## New Subagent Fields
+
+### `background: true`
+Always runs the subagent as a background task. Background subagents run concurrently, permissions are pre-approved at launch, and MCP tools are NOT available.
+
+### `isolation: worktree`
+Runs the subagent in a temporary git worktree. The worktree is automatically cleaned up if the subagent makes no changes. If changes are made, the worktree path and branch are returned in the result. Useful for isolated experiments or risky operations.
+
 ## Where Subagents Live
 
 | Location | Scope | Priority |
@@ -74,31 +82,69 @@ When enabled:
 
 ## Hook Events
 
+### In Subagent Frontmatter
 | Event | Matcher | When |
 |-------|---------|------|
 | `PreToolUse` | Tool name | Before tool executes |
 | `PostToolUse` | Tool name | After tool executes |
 | `Stop` | (none) | Subagent finishes (converted to `SubagentStop` at runtime) |
-| `SubagentStart` | Agent name | Subagent begins (settings.json only) |
-| `SubagentStop` | (none) | Any subagent completes (settings.json only) |
+
+### In settings.json (All Events)
+| Event | Matcher | When |
+|-------|---------|------|
+| `SessionStart` | `startup`, `resume`, `clear`, `compact` | Session begins or resumes |
+| `UserPromptSubmit` | (none) | User submits prompt, before Claude processes |
+| `PreToolUse` | Tool name | Before tool executes |
+| `PermissionRequest` | (none) | Permission dialog appears (not in `-p` mode) |
+| `PostToolUse` | Tool name | After tool succeeds |
+| `PostToolUseFailure` | Tool name | After tool fails |
+| `Notification` | (none) | Claude Code sends notification |
+| `SubagentStart` | Agent name | Subagent begins |
+| `SubagentStop` | (none) | Any subagent completes |
 | `TeammateIdle` | (none) | Teammate goes idle after a turn |
-| `TaskCompleted` | (none) | A task is marked completed |
+| `TaskCompleted` | (none) | Task marked completed |
+| `ConfigChange` | `user_settings`, `project_settings`, `skills` | Config/skills change during session |
+| `PreCompact` | (none) | Before context compaction |
+| `Stop` | (none) | Claude finishes responding |
+| `SessionEnd` | (none) | Session terminates |
+
+### Hook Types
+| Type | Use For | Example |
+|------|---------|---------|
+| `command` | Shell script validation | `"command": "./scripts/validate.sh"` |
+| `prompt` | LLM yes/no decision (uses Haiku) | `"prompt": "Check if all tasks are complete"` |
+| `agent` | Multi-turn validation with tool access (60s default timeout) | `"prompt": "Run tests and verify", "timeout": 120` |
 
 ### Hook Input (stdin JSON)
 ```json
 {
   "session_id": "abc123",
   "tool_name": "Bash",
-  "tool_input": { "command": "npm test" }
+  "tool_input": { "command": "npm test" },
+  "stop_hook_active": false
 }
 ```
 
 ### Hook Exit Codes
 | Code | Behavior |
 |------|----------|
-| 0 | Continue normally |
-| 1 | Error (shows message) |
-| 2 | Block the operation |
+| 0 | Continue normally (stdout added to context for some events) |
+| 1 | Error (shows message, action proceeds) |
+| 2 | Block the operation (stderr fed back to Claude as feedback) |
+
+### Structured JSON Output (exit 0 + JSON to stdout)
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "Command is safe"
+  }
+}
+```
+`permissionDecision` options: `"allow"`, `"deny"`, `"ask"`
+
+**Prevent Stop hook loops:** Check `stop_hook_active` in input -- if true, exit 0 immediately.
 
 ## Foreground vs Background
 
@@ -158,6 +204,7 @@ disallowedTools: Write, Edit
 model: sonnet
 permissionMode: dontAsk
 memory: user
+isolation: worktree
 skills:
   - security-patterns
 hooks:

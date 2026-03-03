@@ -2,7 +2,7 @@
 name: plan-fix
 description: Investigates bugs AND creates actionable TDD fix plans. Creates Linear issues in Todo state. Use when you know you want to fix something - user reports errors, deployment failures, wrong data, or UI issues. Can be chained from investigate skill. Discovers MCPs from CLAUDE.md for debugging (logs, etc.).
 argument-hint: <bug description>
-allowed-tools: Read, Edit, Write, Glob, Grep, Task, Bash, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
+allowed-tools: Read, Edit, Write, Glob, Grep, Task, Bash, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses, mcp__sentry__find_organizations, mcp__sentry__find_projects, mcp__sentry__search_issues, mcp__sentry__get_issue_details, mcp__sentry__analyze_issue_with_seer, mcp__sentry__search_events, mcp__sentry__search_issue_events, mcp__sentry__get_issue_tag_values
 disable-model-invocation: true
 ---
 
@@ -63,18 +63,14 @@ Categorize the reported issue into one of these types:
 
 ### 6.1 Codebase Investigation
 
-Search the codebase for relevant code:
+Search the codebase for relevant code using dedicated tools (NOT Bash):
 
-```bash
-# Find related files
-find src -name "*.ts" -o -name "*.tsx" | head -50
+- **Use Glob** to find files by pattern
+- **Use Grep** to search for relevant patterns: function names, error messages, class references
+- **Use Read** to examine source files, configs, and build scripts
 
-# Search for relevant patterns
-grep -rn "relevant_pattern" src/
-```
-
-Use Glob and Grep tools to:
-- Find the files involved in the bug
+What to find:
+- The files involved in the bug
 - Trace the code path from entry point to the error
 - Look for recent changes that might have introduced the bug
 - Check test files for related test coverage
@@ -96,7 +92,22 @@ Search Linear for related issues:
 - Check if there are related issues that provide context
 - Look for previously attempted fixes
 
-### 6.4 Reproduce the Issue
+### 6.4 Sentry Context
+
+If the bug involves production crashes, errors, or runtime issues, search Sentry for related issues. Use ToolSearch to load Sentry tools before calling them.
+
+1. **Find the org/project** — Use `mcp__sentry__find_organizations` then `mcp__sentry__find_projects` to get slugs
+2. **Search for issues** — Use `mcp__sentry__search_issues` with natural language (e.g., "unresolved crashes from last week")
+3. **Get issue details** — Use `mcp__sentry__get_issue_details` for full stack traces and metadata
+4. **Analyze root cause** — Use `mcp__sentry__analyze_issue_with_seer` for AI-powered analysis
+5. **Check distributions** — Use `mcp__sentry__get_issue_tag_values` for environment/release breakdown
+
+If Sentry issues are found:
+- Document the Sentry issue ID and URL in the PLANS.md `**Sentry:**` field
+- Note frequency, affected users, and releases in Evidence section
+- Include the Sentry issue reference in the Linear issue description (see Section 8)
+
+### 6.5 Reproduce the Issue
 
 When possible, try to reproduce:
 
@@ -113,74 +124,14 @@ npm run lint 2>&1 | tail -50
 
 ## 7. Document Findings in PLANS.md
 
-Write or append to `PLANS.md` at the project root with this structure:
+Read `references/plans-template.md` for the complete template.
 
-```markdown
-# Fix Plan: [Brief Bug Title]
+**Source field:** `Bug report: [Summary of $ARGUMENTS]`
 
-**Issue:** PROJ-xxx (if Linear issue exists, otherwise "To be created")
-**Date:** YYYY-MM-DD
-**Status:** Planning
-**Branch:** fix/PROJ-xxx-brief-description (proposed)
+Include: Context Gathered (Codebase Analysis + MCP Context + Investigation), Tasks, Post-Implementation Checklist, Plan Summary.
+Omit: Triage Results subsection.
 
-## Investigation
-
-### Bug Report
-[What was reported - user's description of the problem]
-
-### Classification
-- **Type:** [API Error | Auth Issue | Deployment Failure | Frontend Bug | Data Issue | Performance | Integration]
-- **Severity:** [Critical | High | Medium | Low]
-- **Affected Area:** [specific component/route/feature]
-
-### Root Cause Analysis
-[What you found during investigation]
-
-#### Evidence
-- **File:** `path/to/file.ts:lineNumber` - [what's wrong here]
-- **File:** `path/to/another-file.ts:lineNumber` - [related issue]
-- **Logs:** [relevant log output if any]
-
-#### Related Code
-- `path/to/file.ts:lineNumber` — [describe what this code does and why it's problematic]
-- `path/to/other-file.ts:lineNumber` — [describe the related code]
-(Reference files and line numbers. Do NOT paste code blocks — the implementer will read the files.)
-
-### Impact
-- [What breaks because of this bug]
-- [Who is affected]
-- [Any data implications]
-
-## Fix Plan (TDD Approach)
-
-### Step 1: [Short description of change]
-**File:** `path/to/file.ts` (create | modify)
-**Test:** `path/to/__tests__/file.test.ts` (create | modify)
-**Pattern:** Follow `path/to/similar-existing-file.ts` structure
-
-**Behavior:**
-- [What this component/function should do — written as a behavioral spec]
-- [State transitions, edge cases, error handling]
-- [Reference existing patterns by file path]
-
-**Tests:**
-1. [Test assertion in plain English]
-2. [Test assertion in plain English]
-3. [Test assertion in plain English]
-
-### Step 2: [Next change]
-(Same structure — behavioral spec, not code)
-
-### Step N: Verify
-- [ ] All new tests pass
-- [ ] All existing tests pass
-- [ ] TypeScript compiles without errors
-- [ ] Lint passes
-- [ ] Build succeeds
-
-## Notes
-- [Any additional context, workarounds, or considerations]
-```
+The Investigation subsection under Context Gathered must include: bug report, classification (type/severity/affected area), root cause, evidence (file paths with line numbers — no code blocks), and impact.
 
 ## 8. Create Linear Issue
 
@@ -205,6 +156,10 @@ Create a Linear issue in the discovered team with status "Todo":
      ## Bug Report
      [Summary of the issue]
 
+     ## Sentry Issue (if applicable)
+     [Sentry issue URL] — [event count] events, [user count] users, release [version]
+     **Action:** Resolve this Sentry issue after fix is merged and released.
+
      ## Root Cause
      [What was found during investigation]
 
@@ -220,9 +175,12 @@ Create a Linear issue in the discovered team with status "Todo":
      - [ ] All existing tests pass
      - [ ] No TypeScript errors
      - [ ] Deployed successfully
+     - [ ] Sentry issue resolved (if applicable)
    - status: "Todo"
    - Apply relevant labels (bug, etc.)
    ```
+
+   Omit the "Sentry Issue" section if the bug did not originate from Sentry.
 
 4. Update PLANS.md with the created issue key (PROJ-xxx).
 
@@ -248,6 +206,7 @@ Create a Linear issue in the discovered team with status "Todo":
 - **ALWAYS check for existing Linear issues** before creating new ones to avoid duplicates.
 - **ALWAYS include file paths and line numbers** in evidence and fix plans.
 - **ALWAYS propose a branch name** following the pattern `fix/PROJ-xxx-brief-description`.
+- **Discover MCPs from CLAUDE.md** - don't hardcode MCP names or paths
 - **Keep fix plans actionable** - another developer (or AI agent) should be able to follow the plan without additional context.
 - **Severity guidelines:**
   - **Critical:** Production down, data loss, security vulnerability
@@ -273,25 +232,10 @@ This skill is NOT for:
 - General investigation without a fix intent (use investigate)
 - Refactoring (create a separate task)
 
-## 12. Termination and Git Workflow
+## 12. Termination
 
-When investigation and planning are complete:
+Follow the termination procedure in `references/plans-template.md`: output the Plan Summary, then create branch, commit (no `Co-Authored-By` tags), and push.
 
-1. **Summarize findings** to the user:
-   - Bug classification and severity
-   - Root cause (confirmed or hypothesized)
-   - Files affected
-   - Linear issue created (PROJ-xxx)
+If chained from investigate skill, reference the investigation findings and note any additional evidence found during planning.
 
-2. **Create branch, commit (no `Co-Authored-By` tags), and push:**
-   ```bash
-   git checkout -b fix/PROJ-xxx-brief-description && git add PLANS.md && git commit -m "plan(PROJ-xxx): add fix plan for brief description" && git push -u origin fix/PROJ-xxx-brief-description
-   ```
-
-3. **Suggest next steps:**
-   - "Run `/plan-implement` to implement the fix plan"
-   - If critical: "This is a critical issue - recommend implementing immediately"
-
-4. **If chained from investigate skill:**
-   - Reference the investigation findings
-   - Note any additional evidence found during the fix planning phase
+Do not ask follow-up questions. Do not offer to implement. Output the summary and stop.

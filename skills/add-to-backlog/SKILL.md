@@ -41,6 +41,15 @@ User references findings from `investigate` skill:
 /add-to-backlog add the issues found by investigate
 ```
 
+### Mode 4: From Sentry
+User references Sentry crash/error reports:
+```
+/add-to-backlog the Sentry issues we found
+/add-to-backlog track the Sentry crash
+```
+
+When creating issues from Sentry findings, include the Sentry issue URL in the description under a `**Sentry Issue:**` section so downstream planning skills can track it.
+
 ## Pre-flight
 
 **Verify Linear MCP:** Call `mcp__linear__list_teams`. If unavailable, **STOP** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
@@ -75,6 +84,9 @@ Structure:
 ```
 **Problem:**
 [What is wrong or missing - 1-2 sentences]
+
+**Sentry Issue:** (include only if originating from Sentry)
+[Sentry issue URL] — [event count] events, [user count] users, release [version]
 
 **Context:**
 [Where this occurs, affected files/areas - brief]

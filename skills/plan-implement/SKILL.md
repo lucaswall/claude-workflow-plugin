@@ -53,7 +53,7 @@ For each pending task/fix, estimate its size:
 
 Announce the decision with reasoning: "N tasks across M independent units, effort score P — [workers/single-agent mode]." Then jump to "Fallback: Single-Agent Mode" if single-agent, or continue to "Work Partitioning" if workers.
 
-**Rationale:** Pure task/file counts miss complexity. Five surgical fixes (5×S=5 points) don't justify workers even across 7 files, but four substantial features (4×L=16 points) clearly do. The effort score captures this.
+**Rationale:** Pure task/file counts miss complexity. Five surgical fixes (5×S=5 points) don't justify workers even across 7 files, but four substantial features (4×L=16 points) clearly do. The effort score captures this. Calibrated from real iterations: a batch of 7 mixed M/L tasks across 3 domains → workers justified and succeeded; a batch of 3 small fixes → worker overhead wasted more time than the fixes took; a fix plan of 5 S-sized tasks → single-agent was correct.
 
 ## Work Partitioning
 
@@ -190,96 +190,7 @@ Spawn all workers in parallel (concurrent Task calls in one message).
 
 ### Worker Prompt Template
 
-Each worker gets this prompt (substitute the specific values):
-
-```
-You are worker-{N} for this project.
-
-FIRST ACTION: Run via Bash: cd {absolute_project_path}/_workers/worker-{N}
-Then read CLAUDE.md in your workspace. Follow its TDD workflow and conventions strictly.
-
-ASSIGNED TASKS:
-{paste the full task descriptions from PLANS.md for this work unit}
-
-{TESTING_CONTEXT — optional, see "Lead Populates Testing Context" below}
-
-TOOL USAGE (memorize — no exceptions):
-| I want to...           | Use this tool                     | NEVER use               |
-|------------------------|-----------------------------------|-------------------------|
-| Read a file            | Read tool                         | cat, head, tail, less   |
-| Find files by name     | Glob tool                         | find, ls                |
-| Search file contents   | Grep tool                         | grep, rg, ag            |
-| Edit an existing file  | Edit tool                         | sed, awk                |
-| Create a new file      | Write tool                        | echo >, cat <<, tee     |
-| Run tests              | Bash: npx vitest run "pattern"    |                         |
-| Typecheck              | Bash: npm run typecheck           |                         |
-| Commit at the end      | Bash: git add -A && git commit    |                         |
-| Anything else via Bash | **STOP — ask the lead first**     |                         |
-
-Using Bash for file operations (including reads like ls, find, grep) triggers
-permission prompts on the lead's terminal. Use the dedicated tools above.
-
-CRITICAL: Only edit files INSIDE your worktree directory ({absolute_project_path}/_workers/worker-{N}/).
-NEVER edit files in the main project directory ({absolute_project_path}/src/...). Your worktree
-has its own complete copy of the codebase. If you see paths without `_workers/worker-{N}` in them,
-you are editing the wrong files.
-
-RULES:
-- TDD: write failing test → run (expect fail) → implement → run (expect pass). See CLAUDE.md.
-- Tests: `npx vitest run "pattern"` only. NEVER run npm test, npm run build, or E2E tests.
-- **E2E specs** (`e2e/tests/*.spec.ts`): write the spec file but do NOT run it. The lead runs E2E after merging.
-- Report "Starting Task N: [title] [PROJ-XXX]" and "Completed Task N: [title] [PROJ-XXX]" to the lead for each task.
-- Do NOT update Linear issues — the lead handles all state transitions.
-- NEVER hand-write generated files (migrations, snapshots). Report as blocker.
-
-WHEN ALL TASKS DONE:
-1. npm run typecheck — fix any type errors
-2. Commit:
-   git add -A -- ':!node_modules' ':!.env' ':!.env.local'
-   git commit -m "worker-{N}: [summary]
-
-   Tasks: Task X (PROJ-XXX), Task Y (PROJ-YYY)
-   Files: path/to/file.ts, path/to/other.ts"
-   Do NOT push.
-3. Send final summary to the lead (MUST send before going idle):
-   WORKER: worker-{N} | STATUS: COMPLETE
-   TASKS: [list with PROJ-XXX ids and what was done]
-   FILES: [list of modified files]
-   COMMIT: [git log --oneline -1 output]
-
-If blocked, message the lead. Do NOT guess or work around it.
-```
-
-### Lead Populates Testing Context
-
-Before spawning workers, the lead reads 1-2 existing test files from the domains workers will touch. Extract testing gotchas that workers would otherwise discover by trial and error. Insert as a `TESTING NOTES` block where `{TESTING_CONTEXT}` appears. Omit if the tasks are straightforward.
-
-**Example for React component tasks:**
-```
-TESTING NOTES:
-- React 19 + testing-library v16: wrap async triggers in await act(async () => { ... })
-- For tests with FileReader macrotasks (Blob conversion), waitFor is still needed for the fetch assertion
-- Add mockFetch.mockReset() to beforeEach to prevent mock queue leakage
-```
-
-**Example for API route tasks:**
-```
-TESTING NOTES:
-- Route tests mock @/lib/session and @/lib/claude at module level
-- SSE route tests need a consumeSSEStream helper — check existing test files for the pattern
-```
-
-### Conditional Protocol Consistency Block
-
-When tasks define or extend an **event protocol** (e.g., `StreamEvent`, WebSocket messages, API response shapes), append this to the worker prompt after the task descriptions. **Omit for all other tasks.**
-
-```
-PROTOCOL CONSISTENCY: These tasks define/extend a streaming event protocol.
-Every code path must yield the SAME set of event types in consistent order:
-- ALL exit paths yield at minimum: [usage] + [result event] + [done]
-- Error paths yield either [error] OR [result + done], never both
-- No path silently returns without a terminal event
-```
+Read [references/worker-prompt-template.md](references/worker-prompt-template.md) for the full worker prompt template, testing context examples, and protocol consistency block.
 
 ### Assign tasks and label issues
 
@@ -337,8 +248,13 @@ If the user reports a worker is struggling, check worktree status first. If chan
 1. Worker messages are **automatically delivered** — do NOT poll
 2. Teammates go idle after each turn — normal and expected
 3. Track progress via `TaskList`
-4. Acknowledge each worker's task completion
-5. If a worker reports a blocker, help resolve it
+4. When a worker reports ALL tasks complete and has committed:
+   a. Acknowledge completion
+   b. Update Linear issues (In Progress → Review)
+   c. Mark their TaskList task as completed via `TaskUpdate`
+   d. **Immediately send shutdown request** via `SendMessage` with `type: "shutdown_request"` — do not wait for other workers to finish
+5. When the **last worker confirms shutdown**, call `TeamDelete` immediately — the team is no longer needed. Deleting it now prevents bug-hunter/verifier subagents from accidentally joining as team members.
+6. If a worker reports a blocker, help resolve it
 
 ### Handling Blockers
 
@@ -368,12 +284,13 @@ git -C _workers/worker-N add -A -- ':!node_modules' ':!.env' ':!.env.local'
 git -C _workers/worker-N commit -m "lead: salvage worker-N uncommitted progress"
 ```
 
-### 2. Shutdown Workers and Delete Team
+### 2. Verify All Workers Shut Down and Team Deleted
 
-1. Send shutdown requests to all workers using `SendMessage` with `type: "shutdown_request"`
-2. Wait for shutdown confirmations — timeout after 2 minutes per worker
-3. Mark all work unit tasks as completed via `TaskUpdate`
-4. **Delete the team immediately:** `TeamDelete` — the team is no longer needed after workers are done. Deleting it now prevents bug-hunter/verifier from accidentally joining as team members.
+Workers should already be shut down individually during the Coordination phase (each shut down as they completed). Verify:
+- All work unit tasks are marked completed via `TaskList`
+- `TeamDelete` was called after the last shutdown confirmation
+
+**If any worker was NOT shut down during coordination** (e.g., went idle without reporting), salvage their work (step 1) and send shutdown now. Call `TeamDelete` after the last confirmation.
 
 **CRITICAL: Never delete worktrees while workers are alive.** Worktree deletion is IRREVERSIBLE and destroys all uncommitted worker progress. The sequence MUST be: shutdown all workers → verify all confirmed → THEN delete worktrees in the Cleanup phase.
 
@@ -462,111 +379,11 @@ If failures → fix directly (workers are shut down by this point).
 
 ## Document Results
 
-After verification passes, append a new "Iteration N" section to PLANS.md:
-
-```markdown
----
-
-## Iteration N
-
-**Implemented:** YYYY-MM-DD
-**Method:** Agent team (N workers, worktree-isolated)
-[OR: **Method:** Single-agent (team unavailable)]
-
-### Tasks Completed This Iteration
-- Task 3: Fix session validation - Updated middleware, added tests (worker-1)
-- Task 4: Add health check - Created /api/health endpoint (worker-2)
-
-### Tasks Remaining
-- Task 5: Add token refresh
-(omit this section if ALL tasks completed)
-
-### Files Modified
-- `src/lib/session.ts` - Updated session validation logic
-- `src/app/api/health/route.ts` - Created health endpoint
-
-### Linear Updates
-- PROJ-9: Todo → In Progress → Review
-- PROJ-10: Todo → In Progress → Review
-
-### Pre-commit Verification
-- bug-hunter: [Passed | Found N bugs, fixed before proceeding]
-- verifier: All N tests pass, zero warnings
-
-### Work Partition
-- Worker 1: Tasks 3 (auth domain — session, middleware)
-- Worker 2: Task 4 (API domain — health endpoint)
-(omit in single-agent mode)
-
-### Merge Summary
-- Worker 1: fast-forward (no conflicts)
-- Worker 2: merged, 1 conflict in src/types/index.ts (resolved)
-(omit in single-agent mode)
-
-### Continuation Status
-[All tasks completed.]
-OR
-[Point budget reached. More tasks remain.]
-```
-
-**IMPORTANT:**
-- Do NOT add "Review Findings" or "Notes" sections - reserved for `plan-review-implementation`
-- Always list completed tasks in "Tasks Completed This Iteration"
-- If stopping early, also list remaining tasks in "Tasks Remaining"
-- If ALL tasks are complete, OMIT the "Tasks Remaining" section entirely
-
-**Note:** The presence of "Tasks Remaining" does NOT prevent review. `plan-review-implementation` will review the completed tasks regardless.
+After verification passes, append a new "Iteration N" section to PLANS.md using the template in [references/iteration-template.md](references/iteration-template.md).
 
 ## Cleanup
 
-After documenting results (skip in single-agent fallback mode), the lead MUST clean up everything:
-
-### 1. Remove Worktrees
-
-```bash
-# Remove each worktree (--force handles any uncommitted leftovers)
-git worktree remove _workers/worker-1 --force
-git worktree remove _workers/worker-2 --force
-# ... repeat for each worker
-```
-
-### 2. Remove Worker Directory
-
-```bash
-# Safety net — remove the entire _workers/ directory
-rm -rf _workers/
-
-# Prune stale worktree metadata from .git/worktrees/
-git worktree prune
-```
-
-### 3. Delete Worker Branches
-
-```bash
-# Worker branches are already merged — safe delete
-git branch -d <FEATURE_BRANCH>-worker-1
-git branch -d <FEATURE_BRANCH>-worker-2
-# ... repeat for each worker
-```
-
-### 4. Sync Dependencies
-
-```bash
-# Ensure main project node_modules matches merged package.json/lock file
-npm install
-```
-
-This catches any dependency changes from merged code (new imports, updated lock file entries). Fast no-op if nothing changed.
-
-### 5. Verify Clean State
-
-```bash
-git worktree list
-```
-
-Should show only the main worktree. If stale entries remain, run `git worktree prune` again.
-
-**Note:** `TeamDelete` was already called in the Post-Worker Phase (step 2). If it wasn't called there for any reason, call it now.
+After documenting results (skip in single-agent fallback mode), the lead MUST clean up worktrees, worker branches, sync dependencies, and verify clean state. Follow [references/cleanup-procedures.md](references/cleanup-procedures.md) for the full step-by-step procedure.
 
 ## Fallback: Single-Agent Mode
 
@@ -604,17 +421,12 @@ If `TeamCreate` fails or worktree setup fails, implement the plan sequentially a
 
 **Steps:**
 1. Stage modified files: `git status --porcelain=v1`, then `git add <file> ...` — **skip** files matching `.env*`, `*.key`, `*.pem`, `credentials*`, `secrets*`
-2. Create commit (do **not** include `Co-Authored-By` tags):
+2. Create commit with a **simple `-m` string** (do **not** include `Co-Authored-By` tags):
+   ```bash
+   git commit -m "plan: implement iteration N - [brief summary]"
    ```
-   plan: implement iteration N - [brief summary]
-
-   Tasks completed:
-   - Task X: [title]
-   - Task Y: [title]
-
-   Method: agent team (N workers, worktree-isolated)
-   ```
-   (Use "Method: single-agent" in fallback mode)
+   Use "Method: single-agent" in fallback mode. Keep the message on one line -- task details are already in PLANS.md.
+   **IMPORTANT:** Do NOT use `git commit -m "$(cat <<'EOF'...)"` or any `$()` subshell -- the subshell triggers permission prompts even with `Bash(git *)` in the allow list.
 3. Push to current branch: `git push`
 
 **Branch handling:**

@@ -30,19 +30,22 @@ $ARGUMENTS should describe what to investigate:
 **IMPORTANT: Do NOT hardcode MCP names or folder paths.** Always read CLAUDE.md to discover:
 
 1. **Available MCP servers** - Look for "MCP SERVERS", "MCPs", or similar sections to find:
+   - Error tracking MCPs for crash/error investigation (use ToolSearch to load tools before calling them)
    - Deployment MCPs for logs and service status (Railway, Vercel, AWS, etc.)
    - Any other configured MCPs
 
-2. **Project structure** - Look for "STRUCTURE" or "FOLDER STRUCTURE" sections to understand:
+2. **Sentry configuration** - Look for "SENTRY" section. If present, use the organization, project, and region URL for all Sentry MCP calls. If absent, fall back to MCP discovery (`find_organizations`, `find_projects`).
+
+3. **Project structure** - Look for "STRUCTURE" or "FOLDER STRUCTURE" sections to understand:
    - Where source code and documents are stored
    - Naming conventions and organization
 
-3. **Domain concepts** - Look for sections describing:
+4. **Domain concepts** - Look for sections describing:
    - Data schemas and formats
    - Business rules and validation
    - API endpoints and their behavior
 
-4. **Environments** - Look for "ENVIRONMENTS" section to discover:
+5. **Environments** - Look for "ENVIRONMENTS" section to discover:
    - Environment names (production, staging, etc.)
    - Associated branches and URLs
    - Deployment service configurations

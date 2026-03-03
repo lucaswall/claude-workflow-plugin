@@ -127,23 +127,13 @@ This is critical for generating plans that align with the project's patterns.
 
 #### 2.3 Explore the Codebase
 
-Explore the codebase to understand existing patterns:
+Explore the codebase to understand existing patterns using dedicated tools (NOT Bash):
 
-```bash
-# Project structure
-find . -type f -name "*.ts" -o -name "*.tsx" | head -50
-find . -type f -name "*.test.*" | head -20
+- **Use Glob** to discover project structure and find files by pattern
+- **Use Read** for package config and build config files
+- **Use Grep** to search for patterns: function names, class definitions, annotations
 
-# Package dependencies
-cat package.json
-
-# Existing patterns
-ls -la src/app/
-ls -la src/components/
-ls -la src/lib/
-```
-
-Use Glob and Grep to find:
+What to find:
 - Existing components similar to what the issues require
 - Test file patterns and conventions
 - API route patterns
@@ -160,6 +150,10 @@ Based on what you learned from CLAUDE.md, identify which MCP servers are availab
 Query relevant MCPs to gather context that will inform the plan. For example:
 - Check Railway for existing services and environment variables
 - Check Linear for related issues or dependencies
+
+#### 2.5 Preserve Sentry References
+
+When planning issues that contain Sentry references in their Linear description (look for `**Sentry Issue:**` sections), carry those Sentry issue URLs into the PLANS.md `**Sentry Issues:**` header field. This ensures the downstream `plan-review-implementation` skill can resolve them when the plan is complete.
 
 ---
 
@@ -271,129 +265,45 @@ For each issue:
 
 Write the plan to `PLANS.md` at the project root using the structure template below.
 
+#### 4.4 Validate Plan Against CLAUDE.md
+
+After writing the plan but before moving issues to Todo, re-read CLAUDE.md and cross-check each task for missing defensive specs:
+
+| Check | What to look for | Example violation |
+|-------|-----------------|-------------------|
+| **Error handling** | Each task touching external APIs or I/O has error handling specs | Plan says "call external API" with no catch or error behavior spec |
+| **Timeouts** | Any network call or external service has a timeout value specified | Plan says "fetch from API" with no timeout spec |
+| **Edge cases** | Empty input, null values, partial results, and concurrent access are addressed | Plan has no test for empty dataset or null response |
+| **Conventions** | Naming, patterns, and state management match CLAUDE.md | Plan uses a pattern that CLAUDE.md explicitly forbids |
+| **Defensive completeness** | Write operations specify atomicity or rollback on failure | Plan says "write to DB" with no failure/rollback spec |
+
+Fix any violations found before proceeding. This step prevents the plan from introducing gaps that become bugs at implementation time.
+
+#### 4.5 Cross-Cutting Requirements Sweep
+
+After writing all tasks, scan the entire plan for these patterns. If a pattern is detected in any task, verify the corresponding specification exists in that task's steps. If missing, add it before finalizing the plan.
+
+| Pattern Detected in Plan | Required Specification |
+|--------------------------|----------------------|
+| Network calls (HTTP clients, external APIs) | Timeout value and timeout error handling behavior |
+| Error messages shown to users (UI error states, toasts, notifications) | Sanitization — generic user message displayed, raw error logged only |
+| Async operations triggered by user actions (button clicks, form submits) | Cancellation or debouncing of in-flight work before starting new |
+| External service calls (third-party APIs, storage, messaging) | Error handling (catch) and behavior on failure |
+| Write operations to persistent storage (DB, files, queues) | Atomicity or rollback semantics on failure |
+| Repeated or concurrent user-triggered operations | Guards against duplicate submissions or race conditions |
+
 ---
 
-## PLANS.md Structure Template
+## PLANS.md Structure
 
-```markdown
-# Implementation Plan
+Read `references/plans-template.md` for the complete template.
 
-**Status:** IN_PROGRESS
-**Branch:** feat/PROJ-123-short-description
-**Issues:** PROJ-123, PROJ-456
-**Created:** YYYY-MM-DD
-**Last Updated:** YYYY-MM-DD
+**Source field:** `Backlog: PROJ-123, PROJ-456` (list the issue keys being planned)
 
-## Summary
+Include: Context Gathered (Codebase Analysis + MCP Context + Triage Results), Tasks, Post-Implementation Checklist, Plan Summary.
+Omit: Investigation subsection.
 
-Brief description of what this plan implements and why.
-
-## Issues
-
-### PROJ-123: Issue Title
-
-**Priority:** High/Medium/Low
-**Labels:** Bug, Feature, etc.
-**Description:** Copy or summarize the issue description from Linear.
-
-**Acceptance Criteria:**
-- [ ] Criterion 1
-- [ ] Criterion 2
-- [ ] Criterion 3
-
-### PROJ-456: Issue Title
-
-(Same structure for additional issues)
-
-## Prerequisites
-
-List anything that must be true before starting implementation:
-- [ ] Database migrations are up to date
-- [ ] Environment variables are configured
-- [ ] Dependencies are installed
-
-## Implementation Tasks
-
-### Task 1: [Short description]
-
-**Issue:** PROJ-123
-**Files:**
-- `src/lib/some-module.ts` (create)
-- `src/lib/__tests__/some-module.test.ts` (create)
-
-**TDD Steps:**
-
-1. **RED** - Write failing test:
-   - Create `src/lib/__tests__/some-module.test.ts`
-   - Test that [specific behavior]
-   - Run: `npm test -- some-module`
-   - Verify: Test fails with [expected error]
-
-2. **GREEN** - Make it pass:
-   - Create `src/lib/some-module.ts`
-   - Implement [specific logic]
-   - Run: `npm test -- some-module`
-   - Verify: Test passes
-
-3. **REFACTOR** - Clean up:
-   - Extract [shared logic] if needed
-   - Ensure naming follows project conventions
-
-**Notes:**
-- Use [specific pattern] from existing codebase
-- Reference: `src/lib/existing-example.ts`
-
-### Task 2: [Short description]
-
-(Same structure for each task)
-
-### Task N: Integration & Verification
-
-**Issue:** PROJ-123, PROJ-456
-**Files:**
-- Various files from previous tasks
-
-**Steps:**
-
-1. Run full test suite: `npm test`
-2. Run linter: `npm run lint`
-3. Run type checker: `npx tsc --noEmit`
-4. Manual verification steps:
-   - [ ] Step 1
-   - [ ] Step 2
-5. Build check: `npm run build`
-
-## MCP Usage During Implementation
-
-Document which MCP tools the implementer should use:
-
-| MCP Server | Tool | Purpose |
-|------------|------|---------|
-| Linear | `update_issue` | Move issues to "In Progress" when starting, "Done" when complete |
-| Railway | `list_services` | Check deployment configuration if needed |
-
-## Error Handling
-
-| Error Scenario | Expected Behavior | Test Coverage |
-|---------------|-------------------|---------------|
-| Invalid input | Return validation error | Unit test |
-| Network failure | Retry with backoff | Integration test |
-| Auth failure | Redirect to login | E2E test |
-
-## Risks & Open Questions
-
-- [ ] Risk/Question 1: Description and mitigation
-- [ ] Risk/Question 2: Description and mitigation
-
-## Scope Boundaries
-
-**In Scope:**
-- Items explicitly mentioned in the issues
-
-**Out of Scope:**
-- Items NOT part of the current issues
-- Future enhancements mentioned but not planned
-```
+Weave each issue's acceptance criteria into the relevant task steps — do not create a separate Issues section.
 
 ---
 
@@ -451,7 +361,12 @@ When planning, consider how MCPs will be used during implementation:
 11. **Keep scope tight.** Only plan what the issues ask for. Do not add nice-to-haves.
 12. **Plans describe WHAT and WHY, not HOW at the code level.** Include: file paths, function names, behavioral specs, test assertions, patterns to follow (reference existing files by path), state transitions. Do NOT include: implementation code blocks, ready-to-paste TypeScript/TSX, full function bodies. The implementer (plan-implement workers) writes all code — your job is architecture and specification. Exception: short one-liners for surgical changes (e.g., "add `if (!session.x)` check after the existing `!session.y` check") are fine.
 13. **Move valid issues to Todo.** After writing the plan, update the valid Linear issues to the "Todo" state.
-14. **Flag migration-relevant tasks.** If a task changes DB schema, renames columns, changes identity models, renames env vars, or changes session/token formats, add a note in the task: "**Migration note:** [what production data is affected]". The implementer will log this in `MIGRATIONS.md`.
+14. **Flag migration-relevant tasks.** If a task changes a data schema, renames columns or fields, restructures stored data, changes identity or token formats, or renames env vars, the plan MUST include a full migration strategy in that task. The strategy must specify:
+    - **What changes:** which tables, columns, schemas, or data structures are affected
+    - **Additive or destructive:** whether the change is backward-compatible (additive) or breaks existing data (destructive)
+    - **Rollback approach:** how to revert if the migration fails or must be undone
+    - **Data backfill needs:** whether existing records must be transformed, and how (e.g., startup detection of old format + automatic migration, one-time script, lazy migration on read)
+    Add a note in the task: "**Migration note:** [strategy as described above]". The implementer will log this in `MIGRATIONS.md`.
 
 ---
 
@@ -482,32 +397,8 @@ If the user asks to also implement the plan, tell them to use the `plan-implemen
 
 ---
 
-## Termination: Git Workflow
+## Termination
 
-After writing `PLANS.md` and moving issues to Todo in Linear, complete the session with these git operations:
+Follow the termination procedure in `references/plans-template.md`: output the Plan Summary, then create branch, commit (no `Co-Authored-By` tags), and push.
 
-1. **Create a feature branch:**
-   ```bash
-   git checkout -b feat/PROJ-123-short-description
-   ```
-   Use the primary issue key in the branch name. If multiple issues, use the first one.
-
-2. **Stage and commit the plan** (no `Co-Authored-By` tags):
-   ```bash
-   git add PLANS.md
-   git commit -m "plan(PROJ-123): add implementation plan for [short description]
-
-   Issues: PROJ-123, PROJ-456
-   Status: Todo in Linear"
-   ```
-
-3. **Push the branch:**
-   ```bash
-   git push -u origin feat/PROJ-123-short-description
-   ```
-
-4. **Report completion** to the user with:
-   - Branch name
-   - Summary of what was planned
-   - Number of tasks in the plan
-   - Next step: use `plan-implement` to start implementation
+Do not ask follow-up questions. Do not offer to implement. Output the summary and stop.

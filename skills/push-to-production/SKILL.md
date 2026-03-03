@@ -14,7 +14,7 @@ Promote `main` to `release` with automated backup, migration assessment, and mer
 
 ### 1.1 Verify Linear MCP
 
-**ALWAYS call `mcp__linear__list_teams` directly.** Do NOT try to determine MCP availability by inspecting the tool list, checking settings, or reasoning about it — you MUST actually invoke the tool and check the result. If the call fails or returns an error, **STOP** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
+**ALWAYS call `mcp__linear__list_teams` directly.** Do NOT try to determine MCP availability by inspecting the tool list, checking settings, or reasoning about it — you MUST actually invoke the tool and check the result. If the call fails or returns an error, **warn** but do not stop — Linear state transitions are cosmetic, the release can proceed without them.
 
 Extract the team name from the response (there should only be one team in most cases).
 
@@ -32,16 +32,17 @@ git status --porcelain
 
 If any check fails, **STOP** and tell the user what to fix.
 
-### 1.3 Docker (for migration validation)
+### 1.3 Docker (OrbStack)
 
-Ensure Docker is available for migration validation:
+Ensure OrbStack and Docker are available for migration validation:
 
 ```bash
-docker --version
+orb status
 ```
 
-- If available: proceed
-- If not: **STOP** — "Docker is not installed. Install Docker to enable migration validation."
+- If **Running**: proceed
+- If **Stopped**: start it with `orb start`, then verify with `docker compose ps`
+- If `orb` command not found: **STOP** — "OrbStack is not installed. Install with `brew install orbstack`."
 
 Then ensure local Postgres is running (consult CLAUDE.md for docker compose file location):
 
@@ -69,7 +70,13 @@ All four must match. If any fails, **STOP**: "Drizzle migration internals have c
 
 This verification is safe because we deploy the same `node_modules` — the code we check here is the code that will run in production.
 
-### 1.5 Build & Tests
+### 1.5 Check for Pending PLANS.md
+
+Read `PLANS.md` from project root (if it exists). If it contains incomplete tasks (tasks not marked as done), **STOP**: "There are incomplete tasks in PLANS.md. Finish implementation first or clear the plan before releasing."
+
+If PLANS.md doesn't exist or has no incomplete tasks, continue.
+
+### 1.6 Build & Tests
 
 Run the `verifier` agent (full mode) to confirm unit tests, lint, and build pass:
 
@@ -79,7 +86,7 @@ Use Task tool with subagent_type "verifier"
 
 If verifier reports failures, **STOP**. Do not proceed with a broken build.
 
-### 1.6 E2E Tests
+### 1.7 E2E Tests
 
 Run the `verifier` agent in E2E mode to confirm end-to-end tests pass:
 
@@ -87,21 +94,20 @@ Run the `verifier` agent in E2E mode to confirm end-to-end tests pass:
 Use Task tool with subagent_type "verifier" with prompt "e2e"
 ```
 
-Docker is already verified in Phase 1.3, so prerequisites are met.
+Docker/OrbStack is already verified in Phase 1.3, so prerequisites are met.
 
 If E2E tests fail, **STOP**. Do not proceed — E2E failures indicate integration issues that must be fixed before release.
 
-### 1.7 Release Branch Exists
+### 1.8 Release Branch Exists
 
 ```bash
 git rev-parse --verify origin/release
 ```
 
-If `release` branch doesn't exist, **STOP** and tell the user to create it.
-
-### 1.8 Check for Pending PLANS.md
-
-Read `PLANS.md` from project root (if it exists). If it contains incomplete tasks (tasks not marked as done), **STOP**: "There are incomplete tasks in PLANS.md. Finish implementation first or clear the plan before releasing."
+If `release` branch doesn't exist, **STOP** and tell the user to create it:
+```
+git checkout -b release && git push -u origin release && git checkout main
+```
 
 ### 1.9 Diff Assessment
 
@@ -117,6 +123,8 @@ If there are no commits to promote, **STOP**: "Nothing to promote. `main` and `r
 Show the user the commit list and file diff summary.
 
 **First release (no prior tags):** If `git describe --tags` fails, this is the first tagged release. Use the full commit history and treat the current `package.json` version as the starting version.
+
+**IMPORTANT:** Wait for the user to acknowledge the diff summary before proceeding to Phase 2.
 
 ## Phase 2: Assess Migrations
 
@@ -383,7 +391,7 @@ Log potential production data migrations here during development. These notes ar
 
 **Determine version** (follows [Semantic Versioning 2.0.0](https://semver.org/)):
 
-1. Read `CHANGELOG.md` and extract the current version from the first `## [x.y.z]` header
+1. Read `CHANGELOG.md` and extract the current version from the first `## [x.y.z]` header. If `CHANGELOG.md` doesn't exist, this is the first release — create it fresh.
 2. If `<arguments>` contains a version (e.g., `2.0.0`):
    - Validate it's valid semver (X.Y.Z)
    - Validate it's strictly higher than current version
@@ -421,6 +429,7 @@ See [references/changelog-guidelines.md](references/changelog-guidelines.md) if 
    - New version link: compare previous version tag to new version tag
    - Format: `[Unreleased]: https://github.com/<owner>/<repo>/compare/vNEW...HEAD`
    - Format: `[NEW]: https://github.com/<owner>/<repo>/compare/vOLD...vNEW`
+   - **First release:** Use `[NEW]: https://github.com/<owner>/<repo>/commits/vNEW` (no previous tag to compare against)
 
 **Update package.json:**
 
@@ -470,19 +479,19 @@ Create a GitHub Release from the tag pushed in Phase 5.6. The release notes come
 First, write the release notes to a temporary file to avoid multi-line Bash command issues:
 
 ```
-Use the Write tool to create _migrations/release-notes.md with the extracted changelog content
+Use the Write tool to create release-notes.md with the extracted changelog content
 ```
 
 Then create the release using `--notes-file` (avoids multi-line `--notes` strings that break Bash permission patterns):
 
 ```bash
-gh release create "v<version>" --title "v<version>" --notes-file _migrations/release-notes.md --verify-tag
+gh release create "v<version>" --title "v<version>" --notes-file release-notes.md --verify-tag
 ```
 
 Clean up the temp file after:
 
 ```bash
-rm -f _migrations/release-notes.md
+rm -f release-notes.md
 ```
 
 **Flags reference:**
@@ -495,10 +504,31 @@ rm -f _migrations/release-notes.md
 **Error handling:** If `gh release create` fails, **do NOT stop the release**. Log a warning in the Phase 6 report:
 ```
 **Warning:** GitHub Release creation failed: [error message]. Create manually with:
-gh release create "v<version>" --title "v<version>" --notes-file _migrations/release-notes.md --verify-tag
+gh release create "v<version>" --title "v<version>" --notes-file release-notes.md --verify-tag
 ```
 
 The git tag and deploy already succeeded — the GitHub Release is cosmetic and can be created manually later.
+
+### 5.8 Verify Deployment (if monitoring is available)
+
+If deployment monitoring is available (e.g., Railway MCP, deployment API), check deployment logs to confirm the release deployed successfully.
+
+Check whether deployment tooling is accessible — if not, skip this step silently.
+
+If available:
+1. Wait briefly (30 seconds) for the deploy to initialize
+2. List recent deployments to find the one triggered by the push to `release`
+3. Fetch logs and look for:
+   - Successful build completion
+   - Server startup confirmation
+   - No crash loops or error patterns
+
+If the deployment appears to have failed:
+- Show the user the relevant log lines
+- **Do NOT stop** — the git tag and GitHub Release already succeeded. The deployment issue needs separate investigation.
+- Note the failure in the Phase 6 report
+
+If deployment monitoring is not available, skip this step and note "Deployment monitoring not available — verify manually" in the Phase 6 report.
 
 ## Phase 6: Post-Release
 
@@ -542,6 +572,7 @@ If the Linear MCP is unavailable (tools fail), **do not STOP** — log a warning
 **Migration:** [Applied successfully | No migration needed]
 **Data operations:** [Applied successfully (list queries) | None]
 **GitHub Release:** [Created | Failed (see warning above)]
+**Deployment:** [Verified — server started successfully | Failed — see below | Monitoring not available — verify manually]
 
 ### Issues Released
 [List of PROJ-xxx: title moved from Done/Merge → Released, or "None"]
@@ -585,8 +616,8 @@ If MIGRATIONS.md mentioned any environment variable changes, remind the user:
 | Merge conflicts | STOP — user resolves manually |
 | Deployment CLI not available | STOP — install/login deployment CLI |
 | pg_dump not found | STOP — install PostgreSQL client tools |
-| Docker not installed | STOP — install Docker |
-| Docker not running | Start Docker, then continue |
+| OrbStack not installed | STOP — `brew install orbstack` |
+| OrbStack stopped | Start with `orb start`, then continue |
 | Invalid/lower version argument | STOP — must be valid semver higher than current |
 | GitHub Release creation fails | Warn in report — release succeeded, create manually later |
 
@@ -604,4 +635,5 @@ If MIGRATIONS.md mentioned any environment variable changes, remind the user:
 - **Never hardcode user data in SQL** — Derive from existing DB content (SELECT DISTINCT, JOINs), never hardcode emails, names, or personal data
 - **Semantic Versioning 2.0.0** — Version bumps follow semver rules: MAJOR for breaking changes, MINOR for new features, PATCH for bug fixes. Every release gets a CHANGELOG.md entry and matching package.json version
 - **Never defer SQL to the user** — All data operations from MIGRATIONS.md must be executed by this skill as part of the release. Never tell the user to run SQL manually post-deploy.
+- **Linear is cosmetic** — Issue state transitions are nice-to-have. Never block a release because Linear MCP is down.
 - **Stop on any failure** — Better to abort than corrupt production

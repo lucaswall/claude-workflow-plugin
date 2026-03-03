@@ -175,7 +175,7 @@ Repro: npm run e2e
 - **Check for prompt argument first** - Determines TDD vs Full vs E2E mode
 - **E2E Mode:** Triggered only when argument is exactly "e2e". Run `npm run e2e`, skip unit tests/lint/build entirely.
 - **TDD Mode:** Run only filtered tests, skip build entirely
-- **Full Mode:** Run all tests, then build only if tests pass
+- **Full Mode:** Run all tests, then lint, then build — each step only if the previous passed
 - Include complete error details for test failures:
   - Expected vs received values
   - Error message

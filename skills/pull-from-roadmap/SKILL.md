@@ -136,7 +136,7 @@ When the user decides on an action:
 
 When removing a feature from the roadmap:
 1. Read the roadmap file to get current content
-2. Delete the entire feature section (from heading through the separator after it)
+2. Delete the entire feature section (from `## Heading` through the `---` separator after it)
 3. Remove the feature's row from the Contents table at the top (if one exists)
 4. Check remaining features for cross-references to the removed feature — update or remove them
 5. Verify file structure is clean (no orphaned separators, no broken links)

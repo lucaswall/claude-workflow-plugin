@@ -42,12 +42,13 @@ Read each entry point. For every import:
 
 Follow imports recursively until the full dependency tree is mapped.
 
-### Step 3: Map API endpoints
+### Step 3: Map data flows
 
-For any `fetch()`, `useSWR()`, or API client calls in client code:
-- Extract the API path
-- Find the corresponding route handler (consult CLAUDE.md for API route patterns)
-- Add the route handler AND its dependencies
+For any API calls, data store access, or external service interactions:
+- Extract the data operation (API path, query, service call)
+- Find the corresponding handler or data source (consult CLAUDE.md for patterns)
+- Add the handler/source AND its dependencies
+- Trace the data flow from source through processing layers to consumer
 
 ### Step 4: Find related files
 

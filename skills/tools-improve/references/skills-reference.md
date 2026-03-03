@@ -177,7 +177,14 @@ Orders table uses legacy schema:
 
 ## Hooks in Skills
 
-Same format as subagents:
+Same format as subagents. Three hook types available:
+
+| Type | Use For |
+|------|---------|
+| `command` | Shell script validation (exit 2 to block) |
+| `prompt` | LLM yes/no decision using Haiku |
+| `agent` | Multi-turn validation with tool access (default 60s timeout) |
+
 ```yaml
 ---
 name: safe-modifier
@@ -192,6 +199,10 @@ hooks:
       hooks:
         - type: command
           command: "npm run lint"
+  Stop:
+    - hooks:
+        - type: prompt
+          prompt: "Check if all acceptance criteria are met. If not, respond with reason."
 ---
 ```
 
