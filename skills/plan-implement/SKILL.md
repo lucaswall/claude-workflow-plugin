@@ -15,7 +15,7 @@ Each worker operates in its own **git worktree** — a fully isolated working di
 
 1. **Read PLANS.md** — Understand the full context and history
 2. **Read CLAUDE.md** — Understand TDD workflow and project rules
-3. **Verify Linear MCP** — Call `mcp__linear__list_teams` **directly** (never delegate to a subagent — subagents don't have MCP access). If the tool is unavailable or errors, **STOP immediately** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill." Do NOT rationalize continuing without Linear.
+3. **Verify Linear MCP** — Call `mcp__linear__list_issues` with `team: "<discovered-team-name>"` and `state: "Todo"` **directly** (never delegate to a subagent — subagents don't have MCP access). If the tool is unavailable or errors, **STOP immediately** and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill." Do NOT rationalize continuing without Linear.
 4. **Identify pending work** — Use this priority order:
    - Check latest Iteration block for "Tasks Remaining" section
    - Look for `## Fix Plan` (h2 level) with no iteration after it

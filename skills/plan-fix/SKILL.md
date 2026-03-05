@@ -216,7 +216,7 @@ Create a Linear issue in the discovered team with status "Todo":
 - **DO NOT expose secrets, API keys, or sensitive environment variable values** in PLANS.md or Linear issues.
 - **DO NOT hallucinate code** - only reference code that actually exists in the codebase.
 - **Plans describe WHAT and WHY, not HOW at the code level.** Include: file paths, function names, behavioral specs, test assertions, patterns to follow (reference existing files by path), state transitions. Do NOT include: implementation code blocks, ready-to-paste TypeScript/TSX, full function bodies. The implementer (plan-implement workers) writes all code — your job is architecture and specification. Exception: short one-liners for surgical changes (e.g., "add `if (!session.x)` check after the existing `!session.y` check") are fine.
-- **Flag migration-relevant fixes** — If the fix changes DB schema, renames columns, changes identity models, renames env vars, or changes session/token formats, add a note in the fix plan: "**Migration note:** [what production data is affected]". The implementer will log this in `MIGRATIONS.md`.
+- **Flag migration-relevant fixes** — If the fix changes DB schema, renames columns, changes identity models, renames env vars, or changes session/token formats, add a note in the fix plan: "**Migration note:** [what production data is affected and how to migrate]". The plan MUST include a migration strategy (e.g., startup detection of old format + automatic migration). The implementer will log this in `MIGRATIONS.md`.
 
 ## 11. Scope Boundaries
 

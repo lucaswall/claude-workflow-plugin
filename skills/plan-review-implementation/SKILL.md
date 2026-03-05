@@ -1,7 +1,7 @@
 ---
 name: plan-review-implementation
 description: QA review of completed implementation using an agent team with 3 domain-specialized reviewers (security, reliability, quality). Use after plan-implement finishes, or when user says "review the implementation". Moves Linear issues Review→Merge. Creates new issues in Todo for bugs found. Falls back to single-agent mode if agent teams unavailable.
-allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task, TeamCreate, TeamDelete, SendMessage, TaskCreate, TaskUpdate, TaskList, TaskGet, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
+allowed-tools: Read, Edit, Write, Glob, Grep, Bash, Task, TeamCreate, TeamDelete, SendMessage, TaskCreate, TaskUpdate, TaskList, TaskGet, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses, mcp__sentry__update_issue, mcp__sentry__find_organizations, mcp__sentry__find_projects, mcp__sentry__search_issues
 disable-model-invocation: true
 ---
 
@@ -15,7 +15,7 @@ Review **ALL** implementation iterations that need review using an agent team wi
 
 1. **Read PLANS.md** — Understand the full plan and iteration history
 2. **Read CLAUDE.md** — Understand project standards and conventions
-3. **Verify Linear MCP** — Call `mcp__linear__list_teams`. If unavailable, STOP and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
+3. **Verify Linear MCP** — Call `mcp__linear__list_issues` with `team: "<discovered-team-name>"` and `state: "Review"`. If unavailable, STOP and tell the user: "Linear MCP is not connected. Run `/mcp` to reconnect, then re-run this skill."
 4. **Assess AI-generated code risk** — If implementation is large or shows AI patterns, apply extra scrutiny
 
 ## Linear State Management
@@ -368,7 +368,7 @@ If there were no findings at all (clean review), a brief "No issues found" summa
   2. Inform user: "Review complete. Changes committed and pushed. Run `/plan-implement` to continue implementation."
 
 - **If all tasks complete and no fix plans needed** (includes iterations where all bugs were fixed inline) → Run E2E tests, update header status, append final status, then create PR:
-  1. **Run E2E tests** using the verifier agent in E2E mode:
+  1. **Run E2E tests** using the verifier agent in E2E mode (as a standalone subagent, NOT a teammate — do NOT pass `team_name`):
      ```
      Use Agent tool with subagent_type "verifier" with prompt "e2e"
      ```
@@ -384,11 +384,19 @@ If there were no findings at all (clean review), a brief "No issues found" summa
 All tasks implemented and reviewed successfully. All Linear issues moved to Merge.
 ```
 
+**Then resolve Sentry issues (if applicable):**
+1. Check CLAUDE.md for a `## SENTRY` section — if the project does not use Sentry, skip this step
+2. Check PLANS.md header for a `**Sentry:**` or `**Sentry Issues:**` field
+3. If Sentry issue URLs/IDs are listed, resolve them using `mcp__sentry__update_issue`:
+   - Use ToolSearch to load `mcp__sentry__update_issue` if not already loaded
+   - For each Sentry issue, call `mcp__sentry__update_issue` with `status: "resolved"`
+   - Log which issues were resolved in the termination output
+
 **Then create the PR:**
 1. Commit any uncommitted changes
 2. Push to remote
 3. Create PR using the `pr-creator` subagent
-4. Inform user with PR URL
+4. Inform user with PR URL and list of Sentry issues resolved (if any)
 
 ## Fallback: Single-Agent Mode
 

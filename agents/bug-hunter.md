@@ -125,7 +125,7 @@ Analyze uncommitted git changes for bugs and project rule violations.
 
 ### UI Safety (When Code Touches User-Visible Output)
 
-- Raw `Exception.message`, error object details, or external API response text flowing directly to user-visible output (rendered text, toast/notification messages, alert dialogs, error state fields) — use generic user-facing messages and log the raw error for debugging only
+- Raw `Exception.message`, error object details, or external API response text flowing directly to user-visible output (rendered text, toast/notification messages, alert dialogs, error state fields) — use generic user-facing messages and log the raw error server-side for debugging only
 
 ### AI-Generated Code Risks
 

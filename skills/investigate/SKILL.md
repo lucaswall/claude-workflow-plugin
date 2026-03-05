@@ -34,7 +34,7 @@ $ARGUMENTS should describe what to investigate:
    - Deployment MCPs for logs and service status (Railway, Vercel, AWS, etc.)
    - Any other configured MCPs
 
-2. **Sentry configuration** - Look for "SENTRY" section. If present, use the organization, project, and region URL for all Sentry MCP calls. If absent, fall back to MCP discovery (`find_organizations`, `find_projects`).
+2. **Sentry configuration** - Look for "SENTRY" section. If present, use the organization, project, and region URL for all Sentry MCP calls. If absent, skip Sentry. See the **Sentry Integration** section below for detailed guidance.
 
 3. **Project structure** - Look for "STRUCTURE" or "FOLDER STRUCTURE" sections to understand:
    - Where source code and documents are stored
@@ -49,6 +49,56 @@ $ARGUMENTS should describe what to investigate:
    - Environment names (production, staging, etc.)
    - Associated branches and URLs
    - Deployment service configurations
+
+## Sentry Integration
+
+**Conditional:** Only applies if CLAUDE.md has a SENTRY section. If no Sentry is configured, skip this entirely.
+
+Read CLAUDE.md SENTRY section for `organizationSlug`, `projectSlugOrId`, and `regionUrl`. Always pass these to every Sentry MCP call. Use ToolSearch to load Sentry tools before calling them.
+
+### When to use Sentry
+
+- User reports crashes or errors in production
+- Investigating runtime exceptions or unhandled errors
+- Need crash frequency, affected user count, or error trends
+- User provides a Sentry issue URL or issue ID
+- Need production stack traces
+
+### Which Sentry tool to use
+
+| Goal | Tool | Example |
+|------|------|---------|
+| List matching issues | `search_issues` | "unresolved errors in production" |
+| Issue details + stacktrace | `get_issue_details` | Pass issue ID |
+| Count errors or search events | `search_events` | "how many errors today" |
+| Filter events within one issue | `search_issue_events` | "events from last hour" on issue X |
+| View a trace | `get_trace_details` | Pass 32-char hex trace ID |
+| Tag distribution for an issue | `get_issue_tag_values` | tagKey: "environment", "url", "browser" |
+| AI root cause analysis | `analyze_issue_with_seer` | Deep analysis with code fix suggestions |
+
+### Investigation patterns
+
+**Error investigation:**
+1. `search_issues` — find matching issues by description or symptoms
+2. `get_issue_details` — get stacktrace, affected users, frequency
+3. `get_issue_tag_values` — check environment/release/url distribution
+4. `search_issue_events` — filter to specific timeframe or environment
+5. `analyze_issue_with_seer` — get AI root cause analysis with code fixes
+
+**Performance investigation:**
+1. `search_events` — query spans: "slow API requests", "p95 response time"
+2. `get_trace_details` — inspect a specific trace for bottlenecks
+
+**Trend investigation:**
+1. `search_events` — "count of errors today vs yesterday", "error rate this week"
+2. `search_issues` — "new issues in the last 24 hours"
+
+### Tips
+
+- Start with `search_issues` for broad exploration, `get_issue_details` when you have a specific issue
+- Use `search_events` for "how many errors today?" style questions
+- Cross-reference Sentry stack traces with local codebase to identify the exact code path
+- Check tag distributions (device, OS, release, environment) to understand issue scope
 
 ## Investigation Workflow
 
@@ -66,6 +116,9 @@ Based on $ARGUMENTS, determine what you're investigating:
 | **General** | Unknown cause, need exploration | All available tools |
 
 ### Step 2: Gather Evidence
+
+**For Sentry (if configured):**
+Start with Sentry for error/performance investigations — it provides the richest context (stacktraces, traces, frequency, affected environments). See the **Sentry Integration** section above for tool selection and patterns.
 
 **For Codebase Analysis:**
 - Use Grep/Glob for specific searches
@@ -115,6 +168,7 @@ Write findings to the conversation (NOT to a file):
 
 ### Context
 - **MCPs used:** [list MCPs accessed]
+- **Sentry issues reviewed:** [issue IDs if applicable]
 - **Environment queried:** [production | staging | N/A]
 - **Files examined:** [list key files checked]
 - **Logs reviewed:** [deployment IDs, time ranges if applicable]
@@ -150,6 +204,8 @@ When investigating deployment issues (if MCP available):
 | $ARGUMENTS is vague | Ask for more specific details |
 | CLAUDE.md doesn't exist | Continue with codebase-only investigation |
 | MCP not available | Skip that MCP, note in report what couldn't be checked |
+| Sentry not configured | Skip Sentry, continue with other sources |
+| Sentry has no matching issues | Note in report — may be a new/unreported issue |
 | File/resource not found | Document in report (may be relevant) |
 | Cannot reproduce issue | Document steps taken, request more context |
 | Logs unavailable | Note in report, suggest alternative approaches |
@@ -158,6 +214,8 @@ When investigating deployment issues (if MCP available):
 
 - **Report only** - Do NOT modify source code or files
 - **No plans** - Do NOT write PLANS.md or fix plans
+- **Start with Sentry** - For error/performance investigations, check Sentry before deployment logs (if configured)
+- **Sentry constants** - ALWAYS pass `organizationSlug`, `projectSlugOrId`, and `regionUrl` from CLAUDE.md to Sentry tools
 - **Discover MCPs** - Read CLAUDE.md to find available tools
 - **Explicit environment** - ALWAYS pass the `environment` parameter to deployment MCP tools when supported; never rely on CLI defaults
 - **Be thorough** - Check multiple sources before concluding

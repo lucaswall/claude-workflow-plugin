@@ -14,9 +14,9 @@ Promote `main` to `release` with automated backup, migration assessment, and mer
 
 ### 1.1 Verify Linear MCP
 
-**ALWAYS call `mcp__linear__list_teams` directly.** Do NOT try to determine MCP availability by inspecting the tool list, checking settings, or reasoning about it — you MUST actually invoke the tool and check the result. If the call fails or returns an error, **warn** but do not stop — Linear state transitions are cosmetic, the release can proceed without them.
+**ALWAYS call `mcp__linear__list_issues` with `team: "<discovered-team-name>"` and `state: "Done"` directly.** Do NOT try to determine MCP availability by inspecting the tool list, checking settings, or reasoning about it — you MUST actually invoke the tool and check the result. If the call fails or returns an error, **warn** but do not stop — Linear state transitions are cosmetic, the release can proceed without them.
 
-Extract the team name from the response (there should only be one team in most cases).
+Record any Done issues for the release notes.
 
 ### 1.2 Git State
 
