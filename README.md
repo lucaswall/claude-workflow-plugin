@@ -96,7 +96,7 @@ If sections are missing, skills fall back to dynamic discovery (e.g., `mcp__line
 | Skill | Trigger | Description |
 |-------|---------|-------------|
 | **investigate** | `/investigate <issue>` | Read-only investigation. Reports findings without creating plans. |
-| **pull-from-roadmap** | `/pull-from-roadmap <feature>` | Deep research + interactive discussion of a feature idea. |
+| **roadmap** | `/roadmap <feature or idea>` | Deep research + discussion → write to roadmap, pull to backlog, plan, modify, or drop. |
 
 ### Release
 
@@ -122,7 +122,7 @@ If sections are missing, skills fall back to dynamic discovery (e.g., `mcp__line
 
 ### Feature from roadmap
 ```
-pull-from-roadmap → add-to-backlog → backlog-refine (optional)
+roadmap → add-to-backlog → backlog-refine (optional)
   → plan-backlog → plan-implement → plan-review-implementation (repeat)
   → push-to-production
 ```
@@ -204,7 +204,7 @@ claude-workflow-plugin/
 │   ├── plan-inline/             # Direct request → TDD plan
 │   ├── plan-review-implementation/  # QA review (agent team)
 │   │   └── references/          # Review checklists
-│   ├── pull-from-roadmap/       # Feature research + discussion
+│   ├── roadmap/                 # Feature research + roadmap management
 │   ├── push-to-production/      # Release automation
 │   │   └── references/          # Migration + changelog guides
 │   └── tools-improve/           # Meta: skill/agent best practices

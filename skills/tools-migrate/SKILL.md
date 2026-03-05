@@ -133,7 +133,7 @@ Classify each plugin skill/agent into one of these categories:
 | Audit skills (code-audit, frontend-review, deep-review) | Source code to audit |
 | Investigation (investigate) | Always relevant |
 | Release (push-to-production) | Deployment pipeline |
-| Backlog (add-to-backlog, backlog-refine, pull-from-roadmap) | Issue tracker |
+| Backlog (add-to-backlog, backlog-refine, roadmap) | Issue tracker |
 | Meta (tools-improve) | Always relevant |
 | Migration (tools-migrate) | Should NOT be migrated (stays in plugin only) |
 

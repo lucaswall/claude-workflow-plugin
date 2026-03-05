@@ -1,26 +1,32 @@
 ---
-name: push-to-roadmap
-description: Deep research and discussion of a new idea to evaluate whether it belongs on the roadmap. Gathers extensive context from codebase, web, APIs, MCPs, and project history, then presents a concise analysis report with feasibility assessment, design considerations, and questions for interactive discussion. After discussion, writes a complete feature spec to the roadmap file following its conventions. Use when user says "push to roadmap", "add to roadmap", "roadmap this idea", or wants to evaluate and document a feature idea for future implementation.
-argument-hint: <feature idea or problem description>
-allowed-tools: Read, Edit, Write, Glob, Grep, Task, Bash, WebSearch, WebFetch, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
+name: roadmap
+description: Deep research and discussion of a roadmap feature or new idea. Gathers extensive context from codebase, web, APIs, MCPs, and project history, then presents a concise analysis report for interactive discussion. After discussion, handles the outcome — write a feature spec to the roadmap, move to backlog, create an inline plan, modify, or drop. Use when user says "roadmap", "pull from roadmap", "push to roadmap", "add to roadmap", "analyze this feature", "research this idea", or wants to evaluate a feature.
+argument-hint: <roadmap item name or new feature description>
+allowed-tools: Read, Edit, Write, Glob, Grep, Task, Bash, WebSearch, WebFetch, mcp__linear__list_teams, mcp__linear__list_issues, mcp__linear__get_issue, mcp__linear__create_issue, mcp__linear__update_issue, mcp__linear__list_issue_labels, mcp__linear__list_issue_statuses
 disable-model-invocation: true
 ---
 
-Deep research, interactive discussion, and roadmap authoring for a new feature idea. You gather extensive context, present findings, discuss with the user to refine the concept, then write a complete feature spec to the roadmap file.
+Deep research, interactive discussion, and action on a feature idea. You gather extensive context, present findings, discuss with the user, then execute whatever outcome they decide — write to roadmap, pull to backlog, plan, modify, or drop.
 
 ultrathink
 
 ## Phase 1: Input Resolution
 
-1. **Parse $ARGUMENTS** — Extract the feature idea or problem description. This is always a new idea being evaluated for the roadmap.
+1. **Parse $ARGUMENTS** — Determine if this is:
+   - **Existing roadmap item:** A reference to a feature in `ROADMAP.md` (or similar roadmap file discovered from CLAUDE.md)
+   - **New idea:** A description of something NOT currently in the roadmap
 
 2. **Read the roadmap file** — Look for `ROADMAP.md` in the project root (or discover the roadmap file path from CLAUDE.md). If found:
    - Read the full file including its Conventions section (if any)
-   - Check existing features for overlap or conflict with the proposed idea
-   - Note the file's structure and conventions for Phase 5
-   - If the idea already exists as a feature, tell the user and ask if they want to refine the existing entry instead
+   - Search for a matching section by exact heading match or keyword overlap
+   - If multiple matches, ask user to clarify
+   - If no match found, treat as a new idea
+   - Check existing features for overlap or conflict
+   - Note the file's structure and conventions for later use
 
-3. **Read CLAUDE.md** — Load project context, tech stack, conventions. Extract the team name from the LINEAR INTEGRATION section if it exists.
+3. **Extract the feature spec** — If existing item, extract the full section (Problem, Goal, Design, Architecture, Edge Cases, Implementation Order). If new idea, use $ARGUMENTS as the raw description.
+
+4. **Read CLAUDE.md** — Load project context, tech stack, conventions. Extract the team name from the LINEAR INTEGRATION section if it exists.
 
 ## Phase 2: Deep Research
 
@@ -28,7 +34,7 @@ Launch parallel research to build comprehensive context. Use Task agents for ind
 
 ### Research Stream 1: Codebase Analysis
 
-Use Task with `subagent_type=Explore` (thoroughness: "very thorough"). Explore the codebase for everything related to this idea:
+Use Task with `subagent_type=Explore` (thoroughness: "very thorough"). Explore the codebase for everything related to this feature:
 - **Current implementation** — What exists today that's relevant? What would this feature touch?
 - **Architecture** — How does the current system work in the affected areas?
 - **Patterns** — What conventions and patterns are established?
@@ -49,7 +55,7 @@ Use Task with `subagent_type=general-purpose` and `model=opus`. Search the web f
 
 Use Task with `subagent_type=Explore` or direct tool calls. Check project state:
 - **Linear issues** — Query existing Backlog/Todo/In Progress issues for related or overlapping work (if Linear MCP available)
-- **Roadmap dependencies** — Does this idea depend on or block existing roadmap items?
+- **Roadmap dependencies** — Does this feature depend on or block other roadmap items?
 - **Recent changes** — Any recent commits or PRs that affect this area?
 
 ### Research guidelines
@@ -79,10 +85,10 @@ After all research completes, synthesize findings into a concise report. Output 
 [Key decisions that need to be made. What are the main approaches? What trade-offs exist?]
 
 ### Recommendations
-[Whether to add to roadmap, defer, drop, or split. Explain why.]
+[What you recommend — implement as-is, modify approach, add to roadmap, defer, drop, or split. Explain why.]
 
 ### Open Questions
-[Genuine questions for the user that would affect the feature design.]
+[Genuine questions for the user that would affect the decision or feature design.]
 ```
 
 **Keep it concise.** Details were gathered for YOUR reasoning. The user gets insights and conclusions.
@@ -95,17 +101,24 @@ After presenting the report, the conversation continues naturally:
 - Explore alternative approaches if the user pushes back
 - Do additional targeted research if new angles come up
 - Help the user shape the feature — refine the problem, goal, design, and edge cases through conversation
-- Take note of decisions made during discussion — these feed directly into the feature spec
+- Take note of decisions made during discussion — these feed into whatever action follows
 
-**Do NOT rush to writing.** The discussion ends when the user explicitly indicates a decision:
-- "Add it" / "put it on the roadmap" / "write it up" → proceed to Phase 5
-- "Drop it" / "not worth it" → stop, nothing to write
-- "Let me think about it" → stop, nothing to write
+**Do NOT rush to a conclusion.** The discussion ends when the user explicitly indicates a decision:
+- "Add it to the roadmap" / "write it up" → proceed to **Write to Roadmap**
+- "Add it to the backlog" → proceed to **Pull to Backlog**
+- "Let's plan this" / "make an inline plan" → proceed to **Create Inline Plan**
+- "Drop it" / "not worth it" → proceed to **Drop**
+- "Modify the roadmap item" → proceed to **Modify**
+- "Let me think about it" → stop, no action needed
 - "Actually, add this to the backlog instead" → tell the user to run `/add-to-backlog` with the refined description
 
-## Phase 5: Write to Roadmap
+## Phase 5: Action
 
-When the user decides to add the feature to the roadmap:
+When the user decides on an action, execute the matching path:
+
+### Write to Roadmap
+
+When the user wants to add a new feature to the roadmap:
 
 1. **Read the roadmap file** to get current content and conventions.
 
@@ -156,6 +169,40 @@ When the user decides to add the feature to the roadmap:
 
 6. **Verify** — Read the file after writing to confirm clean structure (no orphaned separators, no broken links, contents table in sync).
 
+### Pull to Backlog
+
+1. Verify Linear MCP: call `mcp__linear__list_teams`. If unavailable, STOP: "Linear MCP not connected. Run `/mcp` to reconnect."
+2. Create Backlog issues following the add-to-backlog patterns (problem-focused descriptions, proper labels and priority)
+3. If this was an existing roadmap item, ask: **"Remove this feature from the roadmap file?"**
+4. If confirmed → run roadmap cleanup procedure
+
+### Create Inline Plan
+
+1. Summarize what was decided during the discussion
+2. Tell the user: "Run `/plan-inline [summary]` to create the implementation plan."
+3. If this was an existing roadmap item, ask: **"Remove this feature from the roadmap file?"**
+4. If confirmed → run roadmap cleanup procedure
+
+### Drop
+
+1. If this was an existing roadmap item, ask: **"Remove this feature from the roadmap file?"**
+2. If confirmed → run roadmap cleanup procedure
+
+### Modify
+
+1. Edit the feature section in the roadmap file with the agreed changes
+2. Do NOT remove — the feature stays for future evaluation
+
+### Roadmap cleanup procedure
+
+When removing a feature from the roadmap:
+1. Read the roadmap file to get current content
+2. Delete the entire feature section (from `## Heading` through the `---` separator after it)
+3. Remove the feature's row from the Contents table at the top (if one exists)
+4. Check remaining features for cross-references to the removed feature — update or remove them
+5. Verify file structure is clean (no orphaned separators, no broken links)
+6. Follow the roadmap file's conventions section for all modifications (if one exists)
+
 ## Rules
 
 - **Evidence over opinions** — Every finding must be backed by specific evidence (code paths, API docs, forum posts, data points)
@@ -163,7 +210,7 @@ When the user decides to add the feature to the roadmap:
 - **User's context matters** — Use project context from CLAUDE.md (audience, region, scale, constraints) to inform the analysis
 - **Don't oversell or undersell** — Present findings neutrally, let the user decide
 - **Roadmap conventions** — Follow the roadmap file's conventions section for all modifications (if one exists)
-- **No implementation** — This skill researches, discusses, and writes feature specs. It does NOT write code or create implementation plans
+- **No implementation** — This skill researches, discusses, and manages roadmap/backlog. It does NOT write code or create implementation plans (except when creating backlog issues)
 - **Concise reports** — Research is thorough, output is scannable
 - **Draft before writing** — Always show the user the complete feature spec and get approval before modifying the roadmap file
 - **Problem-focused writing** — Problem and Goal sections use user-facing language. Technical details belong in Architecture
